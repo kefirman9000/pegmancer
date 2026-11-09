@@ -33,11 +33,14 @@ button:disabled{cursor:default}
 .chipbtn{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px 9px;font-size:11.5px;font-weight:800;color:var(--muted);white-space:nowrap}
 .chipbtn:disabled{opacity:.45}
 .bar{position:relative;flex:1;min-width:0;height:18px;border-radius:9px;background:var(--panel);border:1px solid var(--line);overflow:hidden}
-#hGhost{position:absolute;inset:0 auto 0 0;width:0;background:repeating-linear-gradient(135deg,#ffb02e66 0 6px,#ffb02e33 6px 12px)}
-#hBar{position:absolute;inset:0 auto 0 0;width:0;background:linear-gradient(90deg,#8a1a10,#ff3b2f);transition:width .35s ease}
-#hBar.over{background:linear-gradient(90deg,#ffb02e,#9cff57)}
-#hScore{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11.5px;white-space:nowrap;font-variant-numeric:tabular-nums;text-shadow:0 1px 2px #0008}
-#hDrops{display:flex;gap:3px;align-items:center;font-size:11px;color:var(--muted);font-weight:800;flex:none}
+#hGhost{position:absolute;inset:auto 0 0 0;height:0;background:repeating-linear-gradient(135deg,#ffb02e66 0 6px,#ffb02e33 6px 12px)}
+#hBar{position:absolute;inset:auto 0 0 0;height:0;background:linear-gradient(0deg,#8a1a10,#ff3b2f);transition:height .35s ease}
+#hBar.over{background:linear-gradient(0deg,#ffb02e,#9cff57);box-shadow:0 0 10px #9cff57aa}
+#meter{flex:none;width:16px;display:flex;flex-direction:column;align-items:center;gap:4px;align-self:center}
+#meter .bar{flex:1;width:14px;min-height:0;height:auto;border-radius:7px}
+#hOver{font-size:10px;font-weight:800;color:var(--green,#9cff57);line-height:1;min-height:10px;white-space:nowrap}
+#hScore{font-variant-numeric:tabular-nums}
+#hDrops{display:flex;flex-direction:column;gap:3px;align-items:center;font-size:11px;color:var(--muted);font-weight:800;flex:none}
 .dot{width:10px;height:10px;border-radius:50%;background:var(--fg);box-shadow:0 0 6px #fff8}
 .dot.used{background:transparent;border:2px solid var(--line);box-shadow:none}
 #modRow{gap:6px;min-height:14px;font-size:11px;font-weight:800;line-height:14px}
@@ -57,7 +60,7 @@ button:disabled{cursor:default}
 .it.locked{border-style:solid;opacity:.3;width:auto;padding:0 6px;justify-content:center;color:var(--muted);font-size:10.5px}
 .it .burn{color:var(--teal);font-size:10px}
 .it.empty{border-style:dashed;opacity:.45;width:34px;justify-content:center;padding:0;color:var(--muted)}
-#stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative}
+#stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;gap:4px;position:relative}
 canvas{display:block;border-radius:10px;touch-action:none}
 #liveRow{display:flex;align-items:center;gap:6px;height:30px;flex:none}
 #live{flex:1;text-align:center;font-family:var(--display);font-size:19px;font-variant-numeric:tabular-nums;line-height:30px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -135,18 +138,17 @@ h3{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute
   <header id="hud">
     <div class="row">
       <div class="stat"><span>Round</span><b id="hRound">1</b></div>
-      <div class="stat"><span>Quota</span><b id="hTarget">0</b></div>
+      <div class="stat"><span>Quota</span><b id="hScore">0/0</b></div>
       <div class="stat gold"><span>Coins</span><b id="hGold">0</b></div>
       <div class="stat life"><span>Chances</span><b id="hLives">♥♥♥</b></div>
       <div class="spacer"></div>
       <button class="chipbtn" id="hudExp" type="button">Export</button>
       <button class="chipbtn" id="muteBtn" type="button" aria-label="Toggle sound">♪ On</button>
     </div>
-    <div class="row"><div id="hDrops"></div><div class="bar"><div id="hGhost"></div><div id="hBar"></div><span id="hScore">0 / 0</span></div></div>
     <div class="row" id="modRow" hidden><button id="hMod" type="button"></button></div>
   </header>
   <div id="itemBar" aria-label="Your items"></div>
-  <div id="stage"><canvas id="cv" aria-label="Board of Torment. Drag to aim the soul cannon, release to fire. Hold still to charge a Hellfire shot."></canvas><div id="info" role="status"></div></div>
+  <div id="stage"><div id="meter" aria-hidden="true"><span id="hOver"></span><div class="bar"><div id="hGhost"></div><div id="hBar"></div></div><div id="hDrops"></div></div><canvas id="cv" aria-label="Board of Torment. Drag to aim the soul cannon, release to fire. Hold still to charge a Hellfire shot."></canvas><div id="info" role="status"></div></div>
   <div id="liveRow"><div id="live">Drag to aim, release to fire</div><button id="bankBtn" type="button" hidden>End round</button></div>
   <div id="tray"></div>
 </div>
@@ -871,11 +873,11 @@ function updateHud(){
   if(!st)return;
   const k=[st.round,st.tgt,st.coins,st.roundScore,st.dropsLeft,st.dropsMax,st.lives,st.maxLives,st.mod&&st.mod.id,st.nextMod&&st.nextMod.r,st.quotaHit,st.phase].join('|');
   if(k===hudKey)return;hudKey=k;
-  $('hRound').textContent=st.round+(st.endless?'':'/'+FINAL);$('hTarget').textContent=fmtInt(st.tgt);$('hGold').textContent=fmt(st.coins);
+  $('hRound').textContent=st.round+(st.endless?'':'/'+FINAL);$('hGold').textContent=fmt(st.coins);
   $('hLives').textContent='♥'.repeat(Math.max(0,st.lives))+'♡'.repeat(Math.max(0,st.maxLives-st.lives));
   const ratio=st.tgt?st.roundScore/st.tgt:0;
-  $('hScore').textContent=fmtInt(st.roundScore)+' / '+fmtInt(st.tgt)+(ratio>=1?`  (×${fmt(Math.floor(ratio*10)/10)})`:'');
-  $('hBar').style.width=Math.min(100,ratio*100)+'%';$('hBar').classList.toggle('over',ratio>=1);
+  $('hScore').textContent=fmtInt(st.roundScore)+'/'+fmtInt(st.tgt);$('hOver').textContent=ratio>=1?'×'+fmt(Math.floor(ratio*10)/10):'';
+  $('hBar').style.height=Math.min(100,ratio*100)+'%';$('hBar').classList.toggle('over',ratio>=1);
   let d='';for(let i=0;i<st.dropsMax;i++)d+=`<span class="dot ${i<st.dropsMax-st.dropsLeft?'used':''}"></span>`;
   $('hDrops').innerHTML=d;const um=st.log?upcomingMod():null;$('modRow').hidden=!st.mod&&!um;$('hMod').classList.toggle('soon',!st.mod&&!!um);
   $('hMod').textContent=st.mod?(st.mod.boss?'BOSS: ':'Audit: ')+st.mod.n+'. '+st.mod.d+' ⓘ':um?`Next round · ${um.boss?'BOSS':'Audit'}: ${um.n} ⓘ`:'';
@@ -992,9 +994,9 @@ window.addEventListener('keydown',e=>{if(!st||!st.log||!ov.hidden||st.phase!=='a
 
 // ---------- render ----------
 function resize(){
-  const rc=stage.getBoundingClientRect();const s=Math.max(.3,Math.min(rc.width/W,rc.height/H));scale=s;
+  const rc=stage.getBoundingClientRect(),mw=$('meter').offsetWidth+4;const s=Math.max(.3,Math.min((rc.width-mw)/W,rc.height/H));scale=s;
   const dpr=Math.min(window.devicePixelRatio||1,3);
-  cv.style.width=W*s+'px';cv.style.height=H*s+'px';cv.width=Math.round(W*s*dpr);cv.height=Math.round(H*s*dpr);
+  cv.style.width=W*s+'px';cv.style.height=H*s+'px';$('meter').style.height=H*s+'px';cv.width=Math.round(W*s*dpr);cv.height=Math.round(H*s*dpr);
   ctx.setTransform(s*dpr,0,0,s*dpr,0,0);
 }
 new ResizeObserver(resize).observe(stage);
@@ -1147,8 +1149,8 @@ function frame(t){
     const prod=D.points*D.mult,ratio=(st.roundScore+prod)/st.tgt;
     const MS=[[.5,'HALFWAY THERE','#fbe9dc'],[1,'QUOTA IN REACH','#9cff57'],[2,'DOUBLE QUOTA','#9cff57'],[5,'FIVE TIMES QUOTA','#ffb02e'],[10,'TEN TIMES QUOTA!','#ffb02e'],[50,'UNHOLY NUMBERS','#ff3b2f'],[250,'THE AUDITOR WEEPS','#ff3b2f']];
     D.ms=D.ms||0;while(D.ms<MS.length&&ratio>=MS[D.ms][0]){const m=MS[D.ms];if(m[0]>(st.roundScore/st.tgt)){popup(PW/2,BT-110,m[1],m[2],m[0]>=5?26:22);if(m[0]>=1){flash(m[2],.18);burst(PW/2,BT-110,m[2],24,220)}chord(m[0]>=5?[659,880,1175]:[523,784])}D.ms++}
-    const gw=Math.min(100,ratio*100)+'%';if(hudGhost!==gw){hudGhost=gw;$('hGhost').style.width=gw}
-  }else if(hudGhost!=='0%'){hudGhost='0%';$('hGhost').style.width='0%'}
+    const gw=Math.min(100,ratio*100)+'%';if(hudGhost!==gw){hudGhost=gw;$('hGhost').style.height=gw}
+  }else if(hudGhost!=='0%'){hudGhost='0%';$('hGhost').style.height='0%'}
   liveBump.p=Math.max(0,liveBump.p-dt*5);liveBump.m=Math.max(0,liveBump.m-dt*5);
   if(tally){const T=tally;T.t+=dt;
     if(!T.stamped&&T.t<.8){T.tick+=dt;if(T.tick>.06){T.tick=0;lastBlip=0;blip(300+T.t*900,.04,'square',.025)}}
