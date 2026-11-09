@@ -67,6 +67,11 @@ canvas{display:block;border-radius:10px;touch-action:none}
 #live br{display:none}
 #live .x{color:var(--red)}
 #live small{font-family:var(--body);font-size:11px;margin-left:6px;color:var(--muted);font-weight:700}
+.interns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:6px 0 10px}
+.intern{text-align:left;background:var(--panel);border:1.5px solid var(--line);border-radius:10px;padding:6px 8px;color:var(--fg);font:inherit;display:flex;flex-direction:column;gap:2px}
+.intern b{font-size:12.5px}.intern small{font-size:11px;color:var(--muted);line-height:1.25}
+.intern.on{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}.intern.locked{opacity:.75}.intern:disabled{opacity:.4}
+#scrBtn{flex:none;font-family:var(--display);font-size:14px;background:var(--panel);color:var(--fg);border:1.5px solid var(--line);border-radius:9px;padding:4px 9px}
 #bankBtn{font-family:var(--display);font-size:14px;background:var(--gold);color:#2a0a00;border:0;border-radius:9px;padding:5px 10px;box-shadow:0 3px 0 #8a3a00;white-space:nowrap}
 #tray{display:flex;gap:5px;align-items:center;overflow-x:auto;scrollbar-width:none;justify-content:safe center;height:28px;flex:none}
 #tray::-webkit-scrollbar{display:none}
@@ -149,7 +154,7 @@ h3{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute
   </header>
   <div id="itemBar" aria-label="Your items"></div>
   <div id="stage"><div id="meter" aria-hidden="true"><span id="hOver"></span><div class="bar"><div id="hGhost"></div><div id="hBar"></div></div><div id="hDrops"></div></div><canvas id="cv" aria-label="Board of Torment. Drag to aim the soul cannon, release to fire. Hold still to charge a Hellfire shot."></canvas><div id="info" role="status"></div></div>
-  <div id="liveRow"><div id="live">Drag to aim, release to fire</div><button id="bankBtn" type="button" hidden>End round</button></div>
+  <div id="liveRow"><div id="live">Drag to aim, release to fire</div><button id="scrBtn" type="button" hidden aria-label="Scramble the board">⟳ 1</button><button id="bankBtn" type="button" hidden>End round</button></div>
   <div id="tray"></div>
 </div>
 <div id="ov" class="overlay" hidden><div class="card" id="ovCard"></div></div>
@@ -161,8 +166,8 @@ const SPECIAL={mult:'#9cff57',gold:'#ffd54a',bumper:'#b26bff',splitter:'#5ce1ff'
 const SPECIAL_GLYPH={mult:'×',gold:'$',bumper:'',splitter:'Y',crit:'!',bomb:'*'};
 const PEGINFO=[['num','Torment pegs: give their value in suffering, then halve. Pop at 0'],['mult','Wrath sigil: +1 mult'],['gold','Coin sigil: +1 soul coin'],['bumper','Rubber sigil: big bounce'],['splitter','Split sigil: splits the soul'],['crit','Agony sigil: doubles mult'],['bomb','Sulfur sigil: blast, once a round']];
 const RAR={1:{n:'Common',c:'#d9a38f',p:5},2:{n:'Uncommon',c:'#9cff57',p:8},3:{n:'Rare',c:'#ffb02e',p:12},4:{n:'Cursed',c:'#c86bff',p:0},5:{n:'Temporary',c:'#5ce1ff',p:6}};
-const TRIG={start:'When a drop starts',hit:'Every peg hit',pop:'Every peg popped',firstPop:'First pop of each drop',wall:'When the soul hits a wall',land:'When a soul lands',end:'When a drop ends',quota:'When you meet quota',restock:'Every restock',round:'When a round starts',bump:'Every rubber sigil hit',bigPop:'Popping a peg born at 8+',passive:'Always on'};
-const trigText=it=>it.every?`Every ${it.every} ${it.trig==='popN'?'pops':it.trig==='hitN'?'hits':'wall hits'}`:TRIG[it.trig];
+const TRIG={start:'When a drop starts',hit:'Every peg hit',pop:'Every peg popped',firstPop:'First pop of each drop',wall:'When the soul hits a wall',land:'When a soul lands',end:'When a drop ends',quota:'When you meet quota',restock:'Every restock',round:'When a round starts',bump:'Every rubber sigil hit',bigPop:'Popping a peg born at 8+',passive:'Always on',tick:'On a timer'};
+const trigText=it=>it.secs?`Every ${it.secs}s while a soul falls`:it.every?`Every ${it.every} ${it.trig==='popN'?'pops':it.trig==='hitN'?'hits':'wall hits'}`:TRIG[it.trig];
 const ITEMS=[
  {id:'sling',n:'Pitchfork Jab',g:'SS',r:1,trig:'start',d:L=>`+${4*L} points`,fn:L=>addPts(4*L)},
  {id:'lantern',n:'Brimstone Lantern',g:'Ln',r:1,trig:'start',d:L=>`+${L} mult`,fn:L=>addMult(L)},
@@ -210,6 +215,14 @@ const ITEMS=[
  {id:'overtimeForm',n:'Overtime Form',g:'OF',r:5,burn:3,trig:'end',d:L=>`Drops score ×${1+.5*L}. Burns out after 3 rounds.`,fn:L=>{D.mult*=1+.5*L}},
  {id:'hound',n:'Leased Hellhound',g:'LH',r:5,burn:3,trig:'start',d:L=>`+${5*L} mult. Burns out after 3 rounds.`,fn:L=>addMult(5*L)},
  {id:'surge',n:'Power Surge',g:'PS',r:5,burn:2,trig:'hit',d:L=>`+${fmt(.3*L)} mult. Burns out after 2 rounds.`,fn:L=>addMult(.3*L)},
+ {id:'kazoo',n:'Tormentor\'s Kazoo',g:'Kz',r:1,trig:'tick',secs:1.5,d:L=>`Double ${L} random peg${L>1?'s':''}`,fn:L=>doublePegs(L)},
+ {id:'gargoyle',n:'Screaming Gargoyle',g:'Gy',r:2,trig:'tick',secs:1,d:L=>`Spit fire at ${L} random peg${L>1?'s':''}, hitting ${L>1?'them':'it'}`,fn:L=>echoHits(shuffle(numPegs()).slice(0,L),'#ff6a00')},
+ {id:'usurper',n:'Usurper\'s Crown',g:'UC',r:3,trig:'start',d:L=>`Your ${L} lowest peg${L>1?'s copy':' copies'} your highest`,fn:L=>{const m=maxPeg();if(!m)return;numPegs().sort((a,b)=>a.v-b.v).slice(0,L).forEach(p=>{p.v=m;p.born=Math.max(p.born,m);p.flash=1})}},
+ {id:'mimic',n:'Mimic Chest',g:'Mx',r:2,trig:'firstPop',d:L=>`${2*L} random pegs copy the popped peg\'s starting value`,fn:(L,c)=>{const v=c.peg&&c.peg.born||0;if(v)shuffle(numPegs()).slice(0,2*L).forEach(p=>{if(p.v<v){p.v=v;p.born=Math.max(p.born,v);p.flash=1}})}},
+ {id:'chain',n:'Chain Lightning',g:'CL',r:2,trig:'hitN',every:6,d:L=>`Arc to the ${L+1} pegs nearest the hit, hitting each`,fn:(L,c)=>{if(c.peg)echoHits(nearPegs(c.peg,L+1),'#5ce1ff',c.peg)}},
+ {id:'kindred',n:'Kindred Torment',g:'KT',r:3,trig:'hitN',every:12,d:L=>`Hit every peg that shares the hit peg\'s value${L>1?`, ${L} times`:''}`,fn:(L,c)=>{if(!c.peg||!c.v0)return;const t=numPegs().filter(p=>p!==c.peg&&p.v===c.v0);for(let k=0;k<L;k++)echoHits(t,'#ff4fd8',c.peg)}},
+ {id:'twin',n:'Twin Strike',g:'2x',r:1,trig:'hit',d:L=>`${10*L}% chance to also hit the nearest peg`,fn:(L,c)=>{if(c.peg&&rnd()<.1*L)echoHits(nearPegs(c.peg,1),'#ffe9c9',c.peg)}},
+ {id:'shrapnel',n:'Bone Shrapnel',g:'Sh',r:1,trig:'pop',d:L=>`Hit the ${L>1?L+' pegs':'peg'} nearest the popped one`,fn:(L,c)=>{if(c.peg)echoHits(nearPegs(c.peg,L),'#ffb02e',c.peg)}},
  {id:'rocket',n:'Hellfire Rocket',g:'Rk',r:2,trig:'wallN',every:4,d:L=>`Blast at the soul (size ${L})`,fn:(L,c)=>{const b=c.ball||anyBall();if(b)explode(b.x,b.y,50+15*L)}},
 ];
 const CURSED=[
@@ -236,6 +249,10 @@ const PERKS=[
  {id:'pockets',n:'Bottomless Coffers',d:'Interest cap rises from 5 to 12 coins.'},
  {id:'pocket',n:'Extra Shelf',d:'+1 item slot (up to 7).',gain:()=>{st.slots=Math.min(7,st.slots+1)}},
  {id:'chef',n:'Canteen Tab',d:'+1 snack slot.',gain:()=>{st.foodSlots++}},
+ {id:'avarice',n:'Oath of Avarice',d:'When a drop starts, trigger slot 4 once per 7 coins you hold (up to 5).'},
+ {id:'emptiness',n:'Oath of Emptiness',d:'When a drop ends, trigger your rightmost item twice per empty slot.'},
+ {id:'chaos',n:'Oath of Chaos',d:'Every second a soul is falling, trigger a random item.'},
+ {id:'disorder',n:'Oath of Disorder',d:'+1 board scramble every round.'},
 ];
 const FOODS=[
  {id:'tea',n:'Lava Latte',p:5,d:'+1 chance (up to your max).',use:()=>{if(st.lives>=st.maxLives)return false;st.lives++}},
@@ -245,6 +262,9 @@ const FOODS=[
  {id:'cookie',n:'Misfortune Cookie',p:6,d:'Get a random item, if you have a free slot.',use:()=>{const it=randomItem();if(!it||!gainItem(it.id,0))return false}},
  {id:'espresso',n:'Hellspresso',p:5,d:'Your next drop scores ×3.',use:()=>{st.espresso=true}},
  {id:'jam',n:'Brimstone Jam',p:6,d:'Level up a random item.',use:()=>{const c=st.inv.filter(x=>x.L<3&&IT[x.id].r<4);if(!c.length)return false;pick(c).L++}},
+ {id:'wager',n:'Devil\'s Wager',p:0,d:'50%: double your coins. Otherwise lose them all.',use:()=>{if(!st.coins)return false;if(rnd()<.5){st.coins*=2;logEv('wager won')}else{st.coins=0;logEv('wager lost')}}},
+ {id:'stew',n:'Chaos Stew',p:6,d:'Turn every relic into a random different one. Levels are kept.',use:()=>{const c=st.inv.filter(x=>IT[x.id].r<4);if(!c.length)return false;c.forEach(x=>{const it=randomItem(ITEMS.filter(i=>i.r!==5&&!st.inv.some(y=>y.id===i.id)));if(it){x.id=it.id;x.burn=it.burn;x.fired=0}})}},
+ {id:'tart',n:'Sacrificial Tart',p:5,d:'Level up your rightmost relic. Your leftmost is destroyed.',use:()=>{if(st.inv.length<2)return false;const r=st.inv[st.inv.length-1];if(IT[r.id].r<4&&r.L<3)r.L++;st.inv.shift()}},
  {id:'popsicle',n:'Lava Pop',p:3,d:'Pop every 1-peg, scoring each.',use:()=>{popRandom(999,p=>p.v===1,true)}},
 ];
 const ELITES=[
@@ -254,6 +274,7 @@ const ELITES=[
  {id:'short',n:'Overtime Ban',d:'1 fewer launch this round.',tip:'Extra Chute, Overtime Hourglass or a Twisted Pretzel make up the launch.'},
  {id:'tax',n:'Tax Season',d:'Coin sigils and restocks give no coins.',tip:'Spend before it hits. Tithe Box and Kickback still pay.'},
 ];
+const FINAL_BOSS={id:'auditor',boss:true,final:true,also:['gardener','astronomer'],n:'The Infernal Auditor',d:'Final review. Before every launch 6 pegs wither, and the buckets shuffle with the middle three paying ×0.5.',tip:'Bring raw mult and multi-peg relics. This is the last one.'};
 const BOSSES=[
  {id:'foreman',n:'Middle Manager Malphas',d:'Sigils are switched off, gravity is heavy, and he confiscates your biggest peg after every launch.',tip:'Sigils are off, so start-of-drop and pop relics have to carry you.'},
  {id:'gardener',n:'Groundskeeper Gremory',d:'Before every launch, 6 random pegs wither away.',tip:'Fewer pegs to hit: flat mult and start-of-drop relics beat per-hit ones.'},
@@ -277,7 +298,9 @@ const cv=$('cv'),ctx=cv.getContext('2d'),stage=$('stage'),ov=$('ov'),ovCard=$('o
 const APPB=window.PegmancerApp||null;
 const VERSION=(()=>{try{return APPB?APPB.version():'web'}catch(e){return 'web'}})();
 let scale=1;
-const rnd=Math.random,pick=a=>a[Math.floor(rnd()*a.length)];
+let rnd=Math.random;const pick=a=>a[Math.floor(rnd()*a.length)];
+function seeded(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const todaySeed=()=>{const d=new Date();return d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate()};
 const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
 function fmt(n){if(!isFinite(n))return '∞';const a=Math.abs(n);if(a>=1e15)return n.toExponential(2).replace('+','');if(a>=1e12)return (n/1e12).toFixed(2)+'T';if(a>=1e9)return (n/1e9).toFixed(2)+'B';if(a>=1e6)return (n/1e6).toFixed(2)+'M';if(a>=1e4)return (n/1e3).toFixed(1)+'k';if(Number.isInteger(n))return String(n);return n.toFixed(a<10?2:1).replace(/\.?0+$/,'')}
 const fmtInt=n=>fmt(Math.floor(n));
@@ -302,6 +325,18 @@ function finishLaunch(){
   blip(500+A.pow*500,.1,'sine',.06);
 }
 let best=load('pegmancer.best2',{round:0,drop:0});
+const meta=Object.assign({stars:0,unlocked:['standard'],sel:'standard',daily:{}},load('pegmancer.meta',{}));
+const VARIANTS=[
+ {id:'standard',n:'Standard Intern',cost:0,d:'The usual paperwork.'},
+ {id:'glass',n:'Glass Intern',cost:3,d:'Max 2 chances. Every relic triggers twice.'},
+ {id:'gambler',n:'Gambling Intern',cost:5,d:'Start with 20 coins and Devil\'s Dice. Prices are 25% higher.'},
+ {id:'hoarder',n:'Hoarding Intern',cost:8,d:'Start with 6 relic slots, but 1 fewer launch every round.'},
+ {id:'pyro',n:'Pyromaniac Intern',cost:12,d:'Every soul is a Hellfire soul. Quotas are 25% higher.'},
+ {id:'probation',n:'On Probation',cost:15,d:'Trial run: only 1 chance, but quotas are 20% lower and you start with 2 oaths.'},
+];
+const isV=id=>!!(st&&st.variant===id);
+function awardStars(){if(!st||st.starsGiven||!st.log)return 0;st.starsGiven=true;const n=Math.floor((st.round-1)/5)+(st.log.rounds.filter(x=>x.won&&x.r%20===0).length);meta.stars+=n;if(st.daily){const k=st.daily;meta.daily[k]=Math.max(meta.daily[k]||0,st.round)}save('pegmancer.meta',meta);return n}
+const modIs=id=>!!(st&&st.mod&&(st.mod.id===id||(st.mod.also||[]).includes(id)));
 const has=id=>!!(st&&st.inv&&st.inv.some(x=>x.id===id));
 const hasPerk=id=>!!(st&&st.perks&&st.perks.includes(id));
 
@@ -373,7 +408,7 @@ function restock(n){
   n=Math.min(n,500);let coins=0;
   for(let k=0;k<n;k++){
     fillEmpty();mergePass();st.restocksRound++;st.restocksRun++;
-    if(!has('void')&&!(st.mod&&st.mod.id==='tax')){st.coins++;coins++}
+    if(!has('void')&&!(modIs('tax'))){st.coins++;coins++}
     fire('restock',{});
     if(hasPerk('rush')&&st.restocksRun%5===0)forceTrigger('last',1);
   }
@@ -390,14 +425,15 @@ function bucketMult(i){
   if(st.bucketOrder)i=st.bucketOrder[i];
   let m=[4,2,1.5,1,1.5,2,4][i];
   if(i===0||i===6)m+=st.perm.edge;
-  if(st.mod&&st.mod.id==='astronomer'&&i>=2&&i<=4)m=.5;
-  if(st.mod&&st.mod.id==='shrink')m=Math.max(.5,m/2);
+  if(modIs('astronomer')&&i>=2&&i<=4)m=.5;
+  if(modIs('shrink'))m=Math.max(.5,m/2);
   return m;
 }
 function target(){
   const r=st.round;let t=(25+boardTotal())*(1+.15*(r-1))*Math.pow(1.045,r-1);
   if(st.mod)t*=st.mod.boss?1.6:1.25;
   if(has('clock'))t*=1.3;
+  if(isV('pyro'))t*=1.25;if(isV('probation'))t*=.8;
   const mag=Math.pow(10,Math.max(0,Math.floor(Math.log10(t))-1));return Math.ceil(t/mag)*mag;
 }
 
@@ -406,7 +442,7 @@ const flashT=[];
 function runItem(i,times){
   const x=st.inv[i];if(!x)return;const it=IT[x.id];if(!it.fn)return;
   if(depth>5)return;depth++;
-  let n=times||1;if(st.inv[i-1]&&st.inv[i-1].id==='amp')n*=2;
+  let n=times||1;if(st.inv[i-1]&&st.inv[i-1].id==='amp')n*=2;if(isV('glass'))n*=2;
   if(D&&D.fx)D.fx[i]=(D.fx[i]||0)+n;
   for(let k=0;k<n;k++){it.fn(x.L,curCtx);x.fired=(x.fired||0)+1;if(st.inv[i+1]&&st.inv[i+1].id==='mirror'){it.fn(x.L,curCtx);st.inv[i+1].fired=(st.inv[i+1].fired||0)+1;flashT[i+1]=performance.now()}}
   flashT[i]=performance.now();depth--;
@@ -415,6 +451,13 @@ let curCtx={};
 function fire(trig,c){
   if(!st||!st.inv)return;const prev=curCtx;curCtx=c||{};
   st.inv.forEach((x,i)=>{const it=IT[x.id];if(it.trig===trig&&!it.every)runItem(i)});
+  curCtx=prev;
+}
+function tickTimers(dt){
+  if(!D||!st||st.phase!=='falling'||!anyBall())return;
+  const t0=D.time||0,t1=t0+dt;D.time=t1;const prev=curCtx;curCtx={ball:anyBall()};
+  st.inv.forEach((x,i)=>{const it=IT[x.id];if(it.trig==='tick'&&Math.floor(t1/it.secs)>Math.floor(t0/it.secs))runItem(i)});
+  if(hasPerk('chaos')&&Math.floor(t1)>Math.floor(t0)){const c=st.inv.map((x,i)=>i).filter(i=>IT[st.inv[i].id].fn);if(c.length)runItem(pick(c))}
   curCtx=prev;
 }
 function fireEvery(trig,count,c){
@@ -438,7 +481,7 @@ function gainItem(id,paid){
   if(st.inv.length>=st.slots)return false;
   st.inv.push({id,L:1,paid,fired:0,burn:it.burn});if(it.gain)it.gain();return true;
 }
-function priceMul(){let m=1+st.round/30;if(has('coupon'))m*=.8;if(has('curse'))m*=1.5;return m}
+function priceMul(){let m=1+st.round/30;if(isV('gambler'))m*=1.25;if(has('coupon'))m*=.8;if(has('curse'))m*=1.5;return m}
 const itemPrice=it=>Math.max(1,Math.round(RAR[it.r].p*priceMul()));
 function randomItem(pool){
   pool=pool||ITEMS.filter(it=>{const o=st.inv.find(x=>x.id===it.id);return !o||o.L<3});
@@ -446,31 +489,38 @@ function randomItem(pool){
 }
 
 // ---------- run flow ----------
-function newRun(){
-  st={round:1,lives:3,maxLives:3,coins:5,inv:[],slots:4,perks:[],foods:[],foodSlots:2,keys:0,frozen:[],
+function newRun(opt={}){
+  const seed=opt.seed||((Math.random()*2**31)>>>0);rnd=seeded(seed);
+  st={seed,daily:opt.daily||null,variant:opt.daily?'standard':meta.sel,scramblesLeft:0,round:1,lives:3,maxLives:3,coins:5,inv:[],slots:4,perks:[],foods:[],foodSlots:2,keys:0,frozen:[],
       specials:{mult:5,gold:3,bumper:1},perm:{edge:0,red:0},pegs:[],mod:null,bucketOrder:null,
       dropsLeft:0,dropsMax:0,dropNo:0,roundScore:0,tgt:0,restocksRound:0,restocksRun:0,quotaHit:false,roundBonus:0,espresso:false,
       phase:'aim',bestDrop:0,offers:null,endless:false,
       log:{started:new Date().toISOString(),drops:[],rounds:[],events:[]}};
+  if(isV('glass')){st.maxLives=2;st.lives=2}
+  if(isV('gambler')){st.coins=20;gainItem('dice',0)}
+  if(isV('hoarder'))st.slots=6;
+  if(isV('probation')){st.maxLives=1;st.lives=1;shuffle(PERKS.filter(p=>p.id!=='thick')).slice(0,2).forEach(pk=>{st.perks.push(pk.id);if(pk.gain)pk.gain()})}
+  logEv('Run as '+VARIANTS.find(v=>v.id===st.variant).n+(st.daily?' (daily '+st.daily+')':'')+' · seed '+seed);
   buildBoard();sel=null;startRound();
 }
 function logEv(s){st.log.events.push({r:st.round,e:s})}
-function rollMod(r){return r%20===0?Object.assign({boss:true},BOSSES[(r/20-1)%3]):r%5===0?pick(ELITES):null}
+function rollMod(r){if(r===FINAL&&!st.endless)return Object.assign({},FINAL_BOSS);return r%20===0?Object.assign({boss:true},BOSSES[(r/20-1)%3]):r%5===0?pick(ELITES):null}
 const upcomingMod=()=>st&&st.nextMod&&st.nextMod.r===st.round+1?st.nextMod.mod:null;
 function startRound(){
   const r=st.round;st.bucketOrder=null;
   st.mod=st.nextMod&&st.nextMod.r===r?st.nextMod.mod:rollMod(r);st.nextMod={r:r+1,mod:rollMod(r+1)};
   st.pegs.forEach(p=>{p.off=false;p.spent=false;p.used=false});
   fillEmpty();
-  if(st.mod&&st.mod.id==='blackout')shuffle(st.pegs.slice()).slice(0,8).forEach(p=>p.off=true);
-  if(st.mod&&st.mod.id==='foreman')st.pegs.forEach(p=>{if(p.kind!=='num'&&p.kind!==null)p.off=true});
-  st.dropsMax=Math.max(1,5+(has('hopper')?1:0)+(has('clock')?2:0)-(st.mod&&st.mod.id==='short'?1:0));
+  if(modIs('blackout'))shuffle(st.pegs.slice()).slice(0,8).forEach(p=>p.off=true);
+  if(modIs('foreman'))st.pegs.forEach(p=>{if(p.kind!=='num'&&p.kind!==null)p.off=true});
+  st.dropsMax=Math.max(1,5+(has('hopper')?1:0)+(has('clock')?2:0)-(modIs('short')?1:0)-(isV('hoarder')?1:0));
+  st.scramblesLeft=1+(hasPerk('disorder')?1:0);
   st.dropsLeft=st.dropsMax;st.dropNo=0;st.roundScore=0;st.quipLevel=0;st.restocksRound=0;st.quotaHit=false;st.roundBonus=0;
   D={points:0,mult:1};fire('round',{});D=null;
   st.tgt=target();st.phase='aim';balls=[];st.launchAnim=null;pull=0;dragging=false;st.hellUsed=false;
   setLive('Drag to aim, release to fire');hideOv();renderTray();renderBar();
 }
-function gravity(){let g=950;if(has('kite'))g*=.8;if(st.mod&&(st.mod.id==='heavy'||st.mod.id==='foreman'))g*=1.4;return g}
+function gravity(){let g=950;if(has('kite'))g*=.8;if((modIs('heavy')||modIs('foreman')))g*=1.4;return g}
 function ballR(){return st&&has('core')?BASE_R*1.35:BASE_R}
 function spawn(x,y,vx,vy){if(balls.filter(b=>b.alive).length>=16)return;balls.push({x,y,vx,vy,alive:true,t:0,still:0,bin:-1,trail:[],lastWall:-1})}
 function tryDrop(pw=.5,ch=0){
@@ -478,21 +528,27 @@ function tryDrop(pw=.5,ch=0){
   st.phase='falling';st.dropNo++;sel=null;renderTray();if(tally)tally.t=Math.max(tally.t,1.6);liveBump.lp=0;liveBump.lm=1;
   D={points:0,mult:1,hits:0,pops:0,walls:0,bucket:0,bucketBonus:0,firstPop:false,cleared:false,triple:0,espresso:st.espresso,fx:{}};st.espresso=false;
   st.pegs.forEach(p=>p.used=false);
-  if(st.mod&&st.mod.id==='gardener')shuffle(numPegs()).slice(0,6).forEach(p=>{p.kind=null;p.v=0});
-  if(st.mod&&st.mod.id==='astronomer')st.bucketOrder=shuffle([0,1,2,3,4,5,6]);
+  if(modIs('gardener'))shuffle(numPegs()).slice(0,6).forEach(p=>{p.kind=null;p.v=0});
+  if(modIs('astronomer'))st.bucketOrder=shuffle([0,1,2,3,4,5,6]);
   const m=muzzle(aimAng);spawn(m.x,m.y,Math.sin(aimAng)*SHOT,Math.cos(aimAng)*SHOT);
+  if(isV('pyro')&&ch<1)balls[balls.length-1].fire=3;
   if(ch>=1){st.hellUsed=true;balls[balls.length-1].fire=5;popup(m.x,m.y+40,'HELLFIRE SOUL','#ff6a00',22);shake=8;flash('#ff6a00',.3);burst(m.x,m.y,'#ff6a00',30,260,3)}
   else burst(m.x,m.y,'#ffb02e',10,160,2.5);
   recoil=1;D.charge=ch;D.power=Math.round(-aimAng*57.3);
   fire('start',{});
   if(hasPerk('ignition'))forceTrigger(1,1);
+  if(hasPerk('avarice')){const k=Math.min(5,Math.floor(st.coins/7));if(k>0)forceTrigger(3,k)}
   if(hasPerk('early')&&st.dropNo===1)forceTrigger('first',3);
   blip(220,.08,'sine',.06);
 }
 function popup(x,y,text,color='#fff',size=14){if(pops.length>140)pops.shift();pops.push({x,y,text,color,size,t:0})}
 
+let echo=0;const zaps=[];
+function nearPegs(p,n){return numPegs().filter(q=>q!==p).sort((a,c)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(c.x-p.x,c.y-p.y)).slice(0,n)}
+// secondary hits from multi-peg relics; they can't set off further multi-peg relics
+function echoHits(list,col,from){if(echo>0||!D)return;echo++;for(const q of list){if(q.kind!=='num'||q.off)continue;if(zaps.length<80)zaps.push(from?{x1:from.x,y1:from.y,x2:q.x,y2:q.y,t:0,c:col}:{x1:q.x,y1:q.y-60,x2:q.x,y2:q.y,t:0,c:col});hitPeg(q,null,true)}echo--}
 function hitPeg(p,b,blast){
-  if(!p.kind||p.off)return;
+  if(!p.kind||p.off)return;const v0=p.v;
   const now=performance.now();
   if(!blast){if(now<p.cool)return;p.cool=now+90}
   p.flash=1;D.hits++;
@@ -500,7 +556,7 @@ function hitPeg(p,b,blast){
   fire('hit',c);
   switch(p.kind){
     case 'mult':{const m=1+st.perm.red;D.mult+=m;popup(p.x,p.y-12,'+'+fmt(m)+' MULT',SPECIAL.mult,18);burst(p.x,p.y,SPECIAL.mult,14,170);blip(330);break}
-    case 'gold':{const tax=st.mod&&st.mod.id==='tax';if(!tax){st.coins++;popup(p.x,p.y-12,'+1c',SPECIAL.gold,13);burst(p.x,p.y,SPECIAL.gold,10,140)}addPts(1);blip(880);break}
+    case 'gold':{const tax=modIs('tax');if(!tax){st.coins++;popup(p.x,p.y-12,'+1c',SPECIAL.gold,13);burst(p.x,p.y,SPECIAL.gold,10,140)}addPts(1);blip(880);break}
     case 'bumper':addPts(2);fire('bump',c);burst(p.x,p.y,SPECIAL.bumper,8,200);blasts.push({x:p.x,y:p.y,r:22,t:0,c:SPECIAL.bumper});blip(260);break;
     case 'splitter':if(!p.used&&b){p.used=true;spawn(b.x,b.y,(rnd()<.5?-1:1)*(140+rnd()*60),-60);popup(p.x,p.y-12,'Split!',SPECIAL.splitter,13);blip(660)}break;
     case 'crit':if(!p.used){p.used=true;D.mult*=2;popup(p.x,p.y-12,'×2 MULT',SPECIAL.crit,20);shake=6;flash(SPECIAL.crit,.22);burst(p.x,p.y,SPECIAL.crit,24,220);blip(990)}break;
@@ -518,7 +574,7 @@ function hitPeg(p,b,blast){
       break;
     }
   }
-  fireEvery('hitN',D.hits,{peg:p,ball:b});
+  fireEvery('hitN',D.hits,{peg:p,ball:b,v0});
 }
 function popPeg(p,b){
   const born=p.born;burst(p.x,p.y,'#ff6a00',10,150,3);blasts.push({x:p.x,y:p.y,r:20,t:0,c:'#ffb02e'});p.kind=null;p.v=0;D.pops++;
@@ -565,6 +621,7 @@ function comboLine(fx){
 }
 function finishDrop(){
   fire('end',{});
+  if(hasPerk('emptiness')){const e=st.slots-st.inv.length;if(e>0)forceTrigger('last',2*e)}
   let s=D.points*D.mult*Math.max(D.bucket,.5);const tags=[];
   if(D.cleared){s*=2;tags.push('Board cleared ×2')}
   if(st.roundBonus){s*=1+st.roundBonus;tags.push('Overclock +'+Math.round(st.roundBonus*100)+'%')}
@@ -580,7 +637,7 @@ function finishDrop(){
   if(!st.quotaHit&&st.roundScore>=st.tgt){st.quotaHit=true;flash('#9cff57',.35);popup(W/2,H/2-110,'QUOTA MET','#9cff57',34);rain(50);fire('quota',{});if(hasPerk('lap'))forceTrigger('all',1);chord([523,659,784])}
   const earned=Math.min(500,Math.floor(st.roundScore/st.tgt))-st.restocksRound;
   if(earned>0)restock(earned);
-  if(st.mod&&st.mod.id==='foreman'&&st.dropsLeft>0){const big=numPegs().sort((a,b)=>b.v-a.v)[0];if(big){popup(big.x,big.y-14,'CONFISCATED '+fmt(big.v),'#ff3b2f',15);big.kind=null;big.v=0}}
+  if(modIs('foreman')&&st.dropsLeft>0){const big=numPegs().sort((a,b)=>b.v-a.v)[0];if(big){popup(big.x,big.y-14,'CONFISCATED '+fmt(big.v),'#ff3b2f',15);big.kind=null;big.v=0}}
   const ratio=st.roundScore/st.tgt;let q=null;for(const [lv,txt] of QUIPS)if(ratio>=lv&&st.quipLevel<lv){q=txt;st.quipLevel=lv}
   if(q){popup(W/2,120,q,'#9cff57',q.length>30?13:18);tags.push('Supervisor: '+q)}
   setLive(`<span>${fmt(st.log.drops.at(-1).pts)}</span> <span class="x">× ${fmt(st.log.drops.at(-1).mult)}</span> × ${fmt(D.bucket)} = ${fmtInt(s)}${tags.length||st.restocksRound>before?'<br><small>'+tags.concat(st.restocksRound>before?['Consignments: '+(st.restocksRound-before)]:[]).join(' · ')+'</small>':''}`);
@@ -599,9 +656,10 @@ function endRound(){
     const left=st.dropsLeft*2;
     const interest=Math.min(Math.floor(st.coins/5),hasPerk('pockets')?12:5);
     const boss=st.mod&&st.mod.boss?10:st.mod?3:0;
-    lines.push(['Quota bonus',base],[`Unused launches (${st.dropsLeft})`,left],['Interest',interest]);if(boss)lines.push([st.mod.boss?'Demon outlasted':'Audit passed',boss]);
+    const over=Math.min(12,Math.max(0,Math.floor(Math.log2(st.roundScore/st.tgt)))*2);
+    lines.push(['Quota bonus',base],[`Unused launches (${st.dropsLeft})`,left],['Interest',interest]);if(over)lines.push([`Overkill (×${fmt(Math.floor(st.roundScore/st.tgt*10)/10)} quota)`,over]);if(boss)lines.push([st.mod.boss?'Demon outlasted':'Audit passed',boss]);
     lines.push(['Consignments this round (already paid)',st.restocksRound]);
-    const total=base+left+interest+boss;st.coins+=total;
+    const total=base+left+interest+boss+over;st.coins+=total;
     if(st.mod&&st.mod.boss){st.keys++;lines.push(['Ledger Key','+1'])}
     chord([523,659,784,1046]);
   }else{st.lives--;chord([392,330,262])}
@@ -639,15 +697,23 @@ function legendHTML(){return '<div class="legend">'+PEGINFO.map(([t,l])=>`<div><
 function showTitle(){
   showOv(`<div class="logo">PEG<br>MANCER</div>
   <div class="tag">You are a lowly devil intern. Launch damned souls down the Boards of Torment and make quota, or the Infernal Auditor will unmake you.</div>
+  <div class="next">Intern <span style="color:var(--gold)">· ★ ${meta.stars} stars</span></div>
+  <div class="interns">${VARIANTS.map(v=>{const own=meta.unlocked.includes(v.id),can=meta.stars>=v.cost;return `<button type="button" class="intern${meta.sel===v.id?' on':''}${own?'':' locked'}" data-v="${v.id}" ${!own&&!can?'disabled':''}><b>${v.n}</b><small>${own?v.d:'Unlock: ★ '+v.cost}</small></button>`}).join('')}</div>
+  <button class="big" id="startBtn" type="button">Start run</button>
+  <button class="chipbtn" id="dailyBtn" type="button">Daily run · ${todaySeed()}${meta.daily[todaySeed()]?' · best round '+meta.daily[todaySeed()]:''}</button>
+  ${best.round?`<div class="next">Best: <b>round ${best.round}</b> · best drop <b>${fmtInt(best.drop)}</b></div>`:''}
+  <div class="shoprow">${load('pegmancer.lastRun','')?'<button class="chipbtn" id="lastBtn" type="button">Export last run</button>':''}<div class="spacer"></div>${APPB?'<button class="chipbtn" id="updBtn" type="button">Check for updates</button>':''}<span class="next">${VERSION==='web'?'Web version':'v'+VERSION}</span></div>
   <div class="how"><p><b>Launch:</b> drag anywhere to aim the soul cannon at the top. The dotted line shows the path to the first peg. Release to fire. <b>Hold still</b> until the cannon glows to fire a Hellfire soul that burns the first 5 pegs it hits (once per round).</p>
   <p>Each launch scores <b>suffering × mult × bucket</b>. A torment peg gives its value, then halves. At 0 it pops.</p>
   <p>Every time your round total passes quota again, a <b>fresh consignment of the damned</b> arrives: empty slots refill, matching neighbours fuse into greater sinners, and you get a soul coin.</p>
-  <p>Relics in the bar above the board fire on their trigger, left to right. Order matters. Miss quota and you lose a chance. Survive ${FINAL} rounds to make Pegmancer.</p></div>
-  ${legendHTML()}
-  <button class="big" id="startBtn" type="button">Start run</button>
-  ${best.round?`<div class="next">Best: <b>round ${best.round}</b> · best drop <b>${fmtInt(best.drop)}</b></div>`:''}
-  <div class="shoprow">${load('pegmancer.lastRun','')?'<button class="chipbtn" id="lastBtn" type="button">Export last run</button>':''}<div class="spacer"></div>${APPB?'<button class="chipbtn" id="updBtn" type="button">Check for updates</button>':''}<span class="next">${VERSION==='web'?'Web version':'v'+VERSION}</span></div>`);
+  <p>Relics in the bar above the board fire on their trigger, left to right. Order matters. Miss quota and you lose a chance. Survive ${FINAL} rounds and the Infernal Auditor to make Pegmancer.</p>
+  <p>Tap <b>⟳</b> before a launch to scramble the board (once per round). Finished runs earn <b>stars</b>; spend them on new interns that bend the rules.</p></div>
+  ${legendHTML()}`);
   $('startBtn').onclick=()=>{initAudio();newRun()};
+  $('dailyBtn').onclick=()=>{initAudio();newRun({seed:todaySeed(),daily:todaySeed()})};
+  ovCard.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{const v=VARIANTS.find(x=>x.id===b.dataset.v);
+    if(!meta.unlocked.includes(v.id)){if(meta.stars<v.cost)return;meta.stars-=v.cost;meta.unlocked.push(v.id)}
+    meta.sel=v.id;save('pegmancer.meta',meta);showTitle()});
   const lb=$('lastBtn');if(lb)lb.onclick=()=>showExport(load('pegmancer.lastRun',''),showTitle);
   const ub=$('updBtn');if(ub)ub.onclick=()=>{try{APPB.checkUpdate()}catch(e){}};
 }
@@ -790,7 +856,7 @@ function showPerkPick(head,lines,then){
   ovCard.querySelectorAll('[data-pk]').forEach(b=>b.onclick=()=>{const p=pool[+b.dataset.pk];st.perks.push(p.id);if(p.gain)p.gain();logEv('perk '+p.n);chord([523,784]);renderTray();renderBar();then()});
 }
 function showVictory(lines){
-  save('pegmancer.lastRun',summaryText());
+  const ns=awardStars();if(ns)lines=lines.concat([['Stars earned','★ '+ns]]);save('pegmancer.lastRun',summaryText());
   showOv(`<div class="logo" style="font-size:46px">PROMOTED</div><div class="tag">All ${FINAL} quotas met and three demons outlasted. You are now, officially, a Pegmancer.</div>${sumHTML('Final round cleared',lines)}
    <button class="big" id="endlessBtn" type="button">Keep working (endless)</button>
    <div class="shoprow"><button class="chipbtn" id="expBtn" type="button">Export run summary</button><div class="spacer"></div><button class="chipbtn" id="titleBtn" type="button">Title screen</button></div>`);
@@ -800,12 +866,13 @@ function showVictory(lines){
 }
 function gameOver(){
   st.phase='over';st.log.ended=new Date().toISOString();
-  save('pegmancer.lastRun',summaryText());showOver();
+  st.newStars=awardStars();save('pegmancer.lastRun',summaryText());showOver();
 }
 function showOver(){
   showOv(`<h2>Performance review: terminal.</h2>
    <div class="sum"><div><span>Reached</span><span>Round ${st.round} (${ZONES[zoneOf(st.round)]})</span></div>
    <div><span>Last round</span><span>${fmtInt(st.roundScore)} / ${fmtInt(st.tgt)}</span></div>
+   <div><span>Stars earned</span><span>★ ${st.newStars||0} (total ${meta.stars})</span></div>
    <div><span>Best drop this run</span><span>${fmtInt(st.bestDrop)}</span></div>
    <div><span>Consignments this run</span><span>${st.restocksRun}</span></div>
    <div class="tot"><span>Best ever</span><span>Round ${best.round} · ${fmtInt(best.drop)}</span></div></div>
@@ -822,6 +889,7 @@ function summaryText(){
   const o=[];
   o.push('PEGMANCER RUN SUMMARY');
   o.push(`Version ${VERSION} · started ${L.started}${L.ended?' · ended '+L.ended:''}`);
+  o.push(`Intern: ${(VARIANTS.find(v=>v.id===st.variant)||VARIANTS[0]).n} · seed ${st.seed}${st.daily?' · daily run '+st.daily:''}`);
   o.push(st.phase==='over'?`Result: out of lives on round ${st.round}`:`Status: round ${st.round} (${ZONES[zoneOf(st.round)]}), ${fmtInt(st.roundScore)} / ${fmtInt(st.tgt)}, ${st.dropsLeft} drops left`);
   o.push(`Lives ${st.lives}/${st.maxLives} · coins ${st.coins} · keys ${st.keys} · restocks this run ${st.restocksRun} · best drop ${fmtInt(st.bestDrop)}`);
   o.push(`Items (${st.inv.length}/${st.slots}, left to right): ${st.inv.map(x=>`${IT[x.id].n} ×${x.L} [fired ${x.fired||0}]`).join(', ')||'none'}`);
@@ -871,7 +939,7 @@ function setLive(h){$('live').innerHTML=h}
 let hudKey='',hudGhost='';
 function updateHud(){
   if(!st)return;
-  const k=[st.round,st.tgt,st.coins,st.roundScore,st.dropsLeft,st.dropsMax,st.lives,st.maxLives,st.mod&&st.mod.id,st.nextMod&&st.nextMod.r,st.quotaHit,st.phase].join('|');
+  const k=[st.scramblesLeft,st.round,st.tgt,st.coins,st.roundScore,st.dropsLeft,st.dropsMax,st.lives,st.maxLives,st.mod&&st.mod.id,st.nextMod&&st.nextMod.r,st.quotaHit,st.phase].join('|');
   if(k===hudKey)return;hudKey=k;
   $('hRound').textContent=st.round+(st.endless?'':'/'+FINAL);$('hGold').textContent=fmt(st.coins);
   $('hLives').textContent='♥'.repeat(Math.max(0,st.lives))+'♡'.repeat(Math.max(0,st.maxLives-st.lives));
@@ -879,12 +947,16 @@ function updateHud(){
   $('hScore').textContent=fmtInt(st.roundScore)+'/'+fmtInt(st.tgt);$('hOver').textContent=ratio>=1?'×'+fmt(Math.floor(ratio*10)/10):'';
   $('hBar').style.height=Math.min(100,ratio*100)+'%';$('hBar').classList.toggle('over',ratio>=1);
   let d='';for(let i=0;i<st.dropsMax;i++)d+=`<span class="dot ${i<st.dropsMax-st.dropsLeft?'used':''}"></span>`;
-  $('hDrops').innerHTML=d;const um=st.log?upcomingMod():null;$('modRow').hidden=!st.mod&&!um;$('hMod').classList.toggle('soon',!st.mod&&!!um);
+  $('hDrops').innerHTML=d;const sb=$('scrBtn');sb.hidden=!(st.log&&st.phase==='aim'&&st.scramblesLeft>0);sb.textContent='⟳ '+st.scramblesLeft;const um=st.log?upcomingMod():null;$('modRow').hidden=!st.mod&&!um;$('hMod').classList.toggle('soon',!st.mod&&!!um);
   $('hMod').textContent=st.mod?(st.mod.boss?'BOSS: ':'Audit: ')+st.mod.n+'. '+st.mod.d+' ⓘ':um?`Next round · ${um.boss?'BOSS':'Audit'}: ${um.n} ⓘ`:'';
   $('bankBtn').hidden=!(st.quotaHit&&st.phase==='aim'&&st.dropsLeft>0);
   $('bankBtn').textContent=`Bank +${st.dropsLeft*2}c`;
 }
 $('hMod').onclick=()=>{if(!st||!(st.mod||upcomingMod()))return;sel=sel&&sel.t==='mod'?null:{t:'mod'};renderInfo()};
+$('scrBtn').onclick=()=>{if(!st||st.phase!=='aim'||st.scramblesLeft<=0)return;st.scramblesLeft--;
+  const live=st.pegs.filter(p=>p.kind),vals=shuffle(live.map(p=>({kind:p.kind,v:p.v,born:p.born,off:p.off,used:p.used,spent:p.spent})));
+  st.pegs.forEach(p=>{p.kind=null;p.v=0});const slots=shuffle(st.pegs.slice()).slice(0,vals.length);
+  slots.forEach((p,i)=>{Object.assign(p,vals[i]);p.flash=1});burst(W/2,330,'#5ce1ff',40,300,3);blip(500,.12,'triangle');logEv('scrambled the board');hudKey='';renderBar()};
 $('bankBtn').onclick=()=>{if(st&&st.quotaHit&&st.phase==='aim')endRound()};
 function renderBar(){
   const el=$('itemBar');if(!st||!st.inv){el.innerHTML='';return}
@@ -1075,6 +1147,7 @@ function draw(t){
     p.flash=Math.max(0,p.flash-.06);
   }
   // blasts
+  for(const z of zaps){ctx.globalAlpha=Math.max(0,1-z.t);ctx.strokeStyle=z.c;ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(z.x1,z.y1);const mx=(z.x1+z.x2)/2+(Math.sin(z.t*40+z.x2)*8),my=(z.y1+z.y2)/2;ctx.lineTo(mx,my);ctx.lineTo(z.x2,z.y2);ctx.stroke()}ctx.globalAlpha=1;
   for(const b of blasts){ctx.globalAlpha=Math.max(0,1-b.t);ctx.strokeStyle=b.c||'#ff8a3d';ctx.lineWidth=3;circle(b.x,b.y,b.r*(.4+.6*b.t));ctx.stroke()}ctx.globalAlpha=1;
   // buckets
   if(st&&st.log)for(let i=0;i<NB;i++){
@@ -1142,9 +1215,11 @@ function frame(t){
     }
   }
   pops.forEach(p=>p.t+=dt*.9);pops=pops.filter(p=>p.t<1);
+  zaps.forEach(z=>z.t+=dt*3);for(let i=zaps.length-1;i>=0;i--)if(zaps[i].t>=1)zaps.splice(i,1);
   blasts.forEach(b=>b.t+=dt*2.5);for(let i=blasts.length-1;i>=0;i--)if(blasts[i].t>=1)blasts.splice(i,1);
   for(let i=parts.length-1;i>=0;i--){const q=parts[i];q.life+=dt;if(q.life>=q.max){parts.splice(i,1);continue}q.vy+=q.grav*dt;q.x+=q.vx*dt;q.y+=q.vy*dt}
   if(D&&st&&st.phase==='falling'){if(D.points!==liveBump.lp){liveBump.p=1;liveBump.lp=D.points}if(D.mult!==liveBump.lm){liveBump.m=1;liveBump.lm=D.mult}}
+  tickTimers(dt);
   if(D&&st&&st.phase==='falling'){
     const prod=D.points*D.mult,ratio=(st.roundScore+prod)/st.tgt;
     const MS=[[.5,'HALFWAY THERE','#fbe9dc'],[1,'QUOTA IN REACH','#9cff57'],[2,'DOUBLE QUOTA','#9cff57'],[5,'FIVE TIMES QUOTA','#ffb02e'],[10,'TEN TIMES QUOTA!','#ffb02e'],[50,'UNHOLY NUMBERS','#ff3b2f'],[250,'THE AUDITOR WEEPS','#ff3b2f']];

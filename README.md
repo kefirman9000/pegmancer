@@ -28,3 +28,12 @@ The whole game is one file, `app/src/main/assets/index.html`. It also runs in a 
 ## Support
 
 If you find this useful, you can support my work through [GitHub Sponsors](https://github.com/sponsors/kefirman9000). Thank you!
+
+### More chaos
+- **Multi-peg relics**: Chain Lightning arcs to nearby pegs, Kindred Torment hits every peg sharing a value, Twin Strike and Bone Shrapnel hit neighbours.
+- **Timer relics**: Tormentor's Kazoo and Screaming Gargoyle fire on a clock while a soul falls; Oath of Chaos triggers a random relic every second.
+- **Peg copying**: Usurper's Crown and Mimic Chest copy big values onto small pegs.
+- **Gambling snacks**: Devil's Wager (double or nothing), Chaos Stew (reroll all relics), Sacrificial Tart (upgrade right, destroy left).
+- **Overkill pay**: beating quota by 2×, 4×, 8×… pays extra coins.
+- **Interns**: earn stars from runs and unlock starting variants (Glass, Gambling, Hoarding, Pyromaniac, On Probation).
+- **Board scramble**, **daily seeded run**, and a final boss at round 60.
