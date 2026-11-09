@@ -76,6 +76,9 @@ canvas{display:block;border-radius:10px;touch-action:none}
 .intern{text-align:left;background:var(--panel);border:1.5px solid var(--line);border-radius:10px;padding:6px 8px;color:var(--fg);font:inherit;display:flex;flex-direction:column;gap:2px}
 .intern b{font-size:12.5px}.intern small{font-size:11px;color:var(--muted);line-height:1.25}
 .intern.on{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}.intern.locked{opacity:.75}.intern:disabled{opacity:.4}
+#fireBtn{flex:none;font-family:var(--display);font-size:18px;letter-spacing:.02em;background:linear-gradient(180deg,#ff6a00,#c0260f);color:#fff3c4;border:0;border-radius:11px;padding:6px 16px;box-shadow:0 3px 0 #6b1206,0 0 14px #ff6a0055;touch-action:none;-webkit-user-select:none;user-select:none}
+#fireBtn:active{transform:translateY(2px);box-shadow:0 1px 0 #6b1206}
+#fireBtn.hot{background:linear-gradient(180deg,#fff3c4,#ff6a00);color:#2a0800;box-shadow:0 3px 0 #6b1206,0 0 22px #ff6a00}
 #scrBtn{flex:none;font-family:var(--display);font-size:14px;background:var(--panel);color:var(--fg);border:1.5px solid var(--line);border-radius:9px;padding:4px 9px}
 #bankBtn{font-family:var(--display);font-size:14px;background:var(--gold);color:#2a0a00;border:0;border-radius:9px;padding:5px 10px;box-shadow:0 3px 0 #8a3a00;white-space:nowrap}
 #tray{display:flex;gap:5px;align-items:center;overflow-x:auto;scrollbar-width:none;justify-content:safe center;height:28px;flex:none}
@@ -159,7 +162,7 @@ h3{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute
   </header>
   <div id="itemBar" aria-label="Your items"></div>
   <div id="stage"><div id="meter" aria-hidden="true"><span id="hOver"></span><div class="bar"><div id="hGhost"></div><div id="hBar"></div></div><div id="hDrops"></div></div><canvas id="cv" aria-label="Board of Torment. Drag to aim the soul cannon, release to fire. Hold still to charge a Hellfire shot."></canvas><div id="info" role="status"></div></div>
-  <div id="liveRow"><div id="live">Drag to aim, release to fire</div><button id="scrBtn" type="button" hidden aria-label="Scramble the board">⟳ 1</button><button id="bankBtn" type="button" hidden>End round</button></div>
+  <div id="liveRow"><div id="live">&nbsp;</div><button id="scrBtn" type="button" hidden aria-label="Scramble the board">⟳ 1</button><button id="bankBtn" type="button" hidden>End round</button><button id="fireBtn" type="button" hidden>Launch</button></div>
   <div id="tray"></div>
 </div>
 <div id="ov" class="overlay" hidden><div class="card" id="ovCard"></div></div>
@@ -330,6 +333,8 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',
 
 let st=null,D=null,balls=[],pops=[],aimX=W/2,aimAng=0,dragging=false,sel=null,shake=0,depth=0,chargeStart=0,anchor=null;
 let pull=0,pullY=0,maxSince=0,kbPull=false,recoil=0;
+const TOUCH=matchMedia('(hover: none), (pointer: coarse)').matches;
+const AIM_HINT=TOUCH?'Drag to aim, then Launch':'Aim with the mouse, click to fire';
 const chargeNow=()=>dragging&&!st.hellUsed&&chargeStart?Math.min(1,Math.max(0,(performance.now()-chargeStart-250)/1000)):0;
 const muzzle=a=>({x:CX+Math.sin(a)*BARREL,y:CY+Math.cos(a)*BARREL});
 const exitX=()=>PW-ballR()-1;
@@ -524,7 +529,7 @@ function resumeRun(){
   st.pegs.forEach(p=>{p.nb=st.pegs.filter(q=>q!==p&&Math.hypot(q.x-p.x,q.y-p.y)<64);p.cool=0});
   logEv('resumed run');hudKey='';hideOv();renderTray();renderBar();
   if(st.phase==='between'||st.dropsLeft<=0){st.phase='aim';endRound()}
-  else{st.phase='aim';setLive('Run resumed. Drag to aim, release to fire')}
+  else{st.phase='aim';setLive('Run resumed. '+AIM_HINT)}
 }
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&st&&st.phase==='aim')saveRun()});
 function newRun(opt={}){
@@ -557,7 +562,7 @@ function startRound(){
   checkEvolve();
   D={points:0,mult:1};fire('round',{});D=null;
   st.tgt=target();st.phase='aim';balls=[];st.launchAnim=null;pull=0;dragging=false;st.hellUsed=false;
-  setLive('Drag to aim, release to fire');hideOv();renderTray();renderBar();saveRun();
+  setLive(AIM_HINT);hideOv();renderTray();renderBar();saveRun();
 }
 function gravity(){let g=950;if(has('kite'))g*=.8;if((modIs('heavy')||modIs('foreman')))g*=1.4;return g}
 function ballR(){return st&&has('core')?BASE_R*1.35:BASE_R}
@@ -759,7 +764,7 @@ function showTitle(){
   <button class="chipbtn" id="dailyBtn" type="button">Daily run · ${todaySeed()}${meta.daily[todaySeed()]?' · best round '+meta.daily[todaySeed()]:''}</button></div>
   ${best.round?`<div class="next">Best: <b>round ${best.round}</b> · best drop <b>${fmtInt(best.drop)}</b></div>`:''}
   <div class="shoprow">${load('pegmancer.lastRun','')?'<button class="chipbtn" id="lastBtn" type="button">Export last run</button>':''}<div class="spacer"></div>${APPB?'<button class="chipbtn" id="updBtn" type="button">Check for updates</button>':''}<span class="next">${VERSION==='web'?'Web version':'v'+VERSION}</span></div>
-  <div class="how"><p><b>Launch:</b> drag anywhere to aim the soul cannon at the top. The dotted line shows the path to the first peg. Release to fire. <b>Hold still</b> until the cannon glows to fire a Hellfire soul that burns the first 5 pegs it hits (once per round).</p>
+  <div class="how"><p><b>Launch:</b> ${TOUCH?'drag on the board to aim the soul cannon, then tap <b>Launch</b>':'move the mouse to aim the soul cannon, then click to fire'}. The dotted line shows the path to the first peg. <b>Hold</b> ${TOUCH?'Launch':'the mouse button'} until the cannon glows to fire a Hellfire soul that burns the first 5 pegs it hits (once per round).</p>
   <p>Each launch scores <b>suffering × mult × bucket</b>. A torment peg gives its value, then halves. At 0 it pops.</p>
   <p>Every time your round total passes quota again, a <b>fresh consignment of the damned</b> arrives: empty slots refill, matching neighbours fuse into greater sinners, and you get a soul coin.</p>
   <p>Relics in the bar above the board fire on their trigger, left to right. Order matters. Miss quota and you lose a chance. Survive ${FINAL} rounds and the Infernal Auditor to make Pegmancer.</p>
@@ -1017,7 +1022,7 @@ function updateHud(){
   $('hScore').textContent=fmtInt(st.roundScore)+'/'+fmtInt(st.tgt);$('hOver').textContent=ratio>=1?'×'+fmt(Math.floor(ratio*10)/10):'';
   $('hBar').style.height=Math.min(100,ratio*100)+'%';$('hBar').classList.toggle('over',ratio>=1);
   let d='';for(let i=0;i<st.dropsMax;i++)d+=`<span class="dot ${i<st.dropsMax-st.dropsLeft?'used':''}"></span>`;
-  $('hDrops').innerHTML=d;const sb=$('scrBtn');sb.hidden=!(st.log&&st.phase==='aim'&&st.scramblesLeft>0);sb.textContent='⟳ '+st.scramblesLeft;const um=st.log?upcomingMod():null;$('modRow').hidden=!st.mod&&!um;$('hMod').classList.toggle('soon',!st.mod&&!!um);
+  $('hDrops').innerHTML=d;$('fireBtn').hidden=!(TOUCH&&st.log&&st.phase==='aim');const sb=$('scrBtn');sb.hidden=!(st.log&&st.phase==='aim'&&st.scramblesLeft>0);sb.textContent='⟳ '+st.scramblesLeft;const um=st.log?upcomingMod():null;$('modRow').hidden=!st.mod&&!um;$('hMod').classList.toggle('soon',!st.mod&&!!um);
   $('hMod').textContent=st.mod?(st.mod.boss?'BOSS: ':'Audit: ')+st.mod.n+'. '+st.mod.d+' ⓘ':um?`Next round · ${um.boss?'BOSS':'Audit'}: ${um.n} ⓘ`:'';
   $('bankBtn').hidden=!(st.quotaHit&&st.phase==='aim'&&st.dropsLeft>0);
   $('bankBtn').textContent=`Bank +${st.dropsLeft*2}c`;
@@ -1124,13 +1129,24 @@ function wallHit(b){
 // ---------- input: drag to aim the cannon, release to fire, hold still to charge ----------
 function boardPt(e){const rc=cv.getBoundingClientRect();return {x:(e.clientX-rc.left)/scale,y:(e.clientY-rc.top)/scale}}
 function aimAt(pt){const dx=pt.x-CX,dy=Math.max(8,pt.y-CY);aimAng=Math.max(-MAX_AIM,Math.min(MAX_AIM,Math.atan2(dx,dy)))}
+// dragging = a launch is being held (charges Hellfire after a short hold)
+let aiming=false;
+const canAim=()=>st&&st.log&&st.phase==='aim'&&ov.hidden;
 cv.addEventListener('pointerdown',e=>{
-  initAudio();if(sel){sel=null;renderBar();renderInfo()}if(!st||!st.log||st.phase!=='aim')return;
-  dragging=true;const pt=boardPt(e);aimAt(pt);anchor=pt;chargeStart=performance.now();cv.setPointerCapture&&cv.setPointerCapture(e.pointerId);
+  initAudio();if(sel){sel=null;renderBar();renderInfo()}if(!canAim())return;
+  const pt=boardPt(e);aimAt(pt);
+  if(e.pointerType==='mouse'){if(e.button!==0)return;dragging=true;chargeStart=performance.now()}
+  else aiming=true;
+  try{cv.setPointerCapture(e.pointerId)}catch(_){}
 });
-cv.addEventListener('pointermove',e=>{if(st&&st.phase==='aim'&&dragging){const pt=boardPt(e);aimAt(pt);if(!anchor||Math.hypot(pt.x-anchor.x,pt.y-anchor.y)>4){anchor=pt;chargeStart=performance.now()}}});
-cv.addEventListener('pointerup',()=>{if(dragging&&st&&st.phase==='aim'){const ch=chargeNow();dragging=false;tryDrop(1,ch)}dragging=false});
-cv.addEventListener('pointercancel',()=>dragging=false);
+cv.addEventListener('pointermove',e=>{if(!canAim())return;if(e.pointerType==='mouse'||aiming)aimAt(boardPt(e))});
+cv.addEventListener('pointerup',e=>{aiming=false;if(e.pointerType==='mouse'&&dragging&&canAim()){const ch=chargeNow();dragging=false;tryDrop(1,ch)}dragging=false});
+cv.addEventListener('pointercancel',()=>{aiming=false;dragging=false});
+const fireBtn=$('fireBtn');
+fireBtn.addEventListener('pointerdown',e=>{e.preventDefault();initAudio();if(!canAim())return;dragging=true;chargeStart=performance.now();try{fireBtn.setPointerCapture(e.pointerId)}catch(_){}});
+fireBtn.addEventListener('pointerup',()=>{if(dragging&&canAim()){const ch=chargeNow();dragging=false;tryDrop(1,ch)}dragging=false;fireBtn.classList.remove('hot')});
+fireBtn.addEventListener('pointercancel',()=>{dragging=false;fireBtn.classList.remove('hot')});
+fireBtn.addEventListener('contextmenu',e=>e.preventDefault());
 window.addEventListener('keydown',e=>{if(!st||!st.log||!ov.hidden||st.phase!=='aim')return;
   if(e.key==='ArrowLeft'){aimAng=Math.min(MAX_AIM,aimAng+.04)}if(e.key==='ArrowRight'){aimAng=Math.max(-MAX_AIM,aimAng-.04)}
   if(e.key===' '||e.key==='Enter'){e.preventDefault();tryDrop(1,0)}});
@@ -1171,7 +1187,7 @@ function draw(t){
     {const prod=D.points*D.mult,ratio=(st.roundScore+prod)/st.tgt,sz=Math.min(34,20+Math.log10(prod+1)*3.5)*(1+.25*Math.max(liveBump.p,liveBump.m));
      ctx.textAlign='center';ctx.font=Math.round(sz)+'px "Lilita One", sans-serif';ctx.fillStyle=ratio>=1?'#9cff57':ratio>=.5?'#ffb02e':'#fbe9dc';ctx.shadowColor=ctx.fillStyle;ctx.shadowBlur=ratio>=1?14:0;
      ctx.fillText('= '+fmt(prod),CX,DROP_Y+46);ctx.shadowBlur=0}
-  }else{ctx.font='800 9px Nunito, sans-serif';ctx.textAlign='left';if(st&&st.log){ctx.fillStyle='#9cff57';ctx.fillText((ZONES[zoneOf(st.round)]+(remodelIdx(st.round)?' · '+REMODELS[remodelIdx(st.round)]:'')).toUpperCase(),8,DROP_Y-22)}else{ctx.fillStyle='#c59a87';ctx.fillText('DRAG TO AIM · RELEASE TO FIRE',8,DROP_Y-22)}if(st&&st.log&&st.phase==='aim'){ctx.textAlign='right';ctx.fillStyle=st.hellUsed?'#5a2318':'#ff6a00';ctx.fillText(st.hellUsed?'HELLFIRE USED':'HOLD STILL: HELLFIRE',W-8,DROP_Y-22)}}
+  }else{ctx.font='800 9px Nunito, sans-serif';ctx.textAlign='left';if(st&&st.log){ctx.fillStyle='#9cff57';ctx.fillText((ZONES[zoneOf(st.round)]+(remodelIdx(st.round)?' · '+REMODELS[remodelIdx(st.round)]:'')).toUpperCase(),8,DROP_Y-22)}else{ctx.fillStyle='#c59a87';ctx.fillText(TOUCH?'DRAG TO AIM · TAP LAUNCH':'AIM WITH MOUSE · CLICK TO FIRE',8,DROP_Y-22)}if(st&&st.log&&st.phase==='aim'){ctx.textAlign='right';ctx.fillStyle=st.hellUsed?'#5a2318':'#ff6a00';ctx.fillText(st.hellUsed?'HELLFIRE USED':'HOLD TO CHARGE: HELLFIRE',W-8,DROP_Y-22)}}
   if(st&&st.log){
     const hotC=chargeNow(),hot=hotC>=1;
     if(st.phase==='aim'){
@@ -1283,6 +1299,8 @@ function frame(t){
   const dt=Math.min(.033,(t-last)/1000);last=t;
   if(st&&st.launchAnim){const A=st.launchAnim;A.d+=A.speed*dt;if(rnd()<.6)parts.push({x:pathPos(A.d).x,y:pathPos(A.d).y,vx:(rnd()-.5)*20,vy:20,life:0,max:.3,color:A.hell?'#ff6a00':'#ffb02e',size:2,grav:0});if(A.d>=pathLen())finishLaunch()}
   if(kbPull&&st&&st.phase==='aim')setPull(pull+dt*1.1);
+  if(TOUCH&&dragging&&st){const hot=chargeNow()>=1;if(hot!==fireBtn.classList.contains('hot')){fireBtn.classList.toggle('hot',hot);fireBtn.textContent=hot?'Hellfire!':'Launch'}}
+  else if(fireBtn.classList.contains('hot')){fireBtn.classList.remove('hot');fireBtn.textContent='Launch'}
   if(st&&st.log&&(st.phase==='falling'||balls.some(b=>b.alive))){
     for(let i=0;i<5;i++)step(dt/5);
     if(st.phase==='falling'&&D){
