@@ -31,6 +31,7 @@ button:disabled{cursor:default}
 .chipbtn{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:12px;font-weight:800;color:var(--muted);white-space:nowrap}
 .chipbtn:disabled{opacity:.45}
 .bar{position:relative;height:20px;border-radius:10px;background:var(--panel);border:1px solid var(--line);overflow:hidden}
+#hGhost{position:absolute;inset:0 auto 0 0;width:0;background:repeating-linear-gradient(135deg,#ffb02e66 0 6px,#ffb02e33 6px 12px)}
 #hBar{position:absolute;inset:0 auto 0 0;width:0;background:linear-gradient(90deg,#8a1a10,#ff3b2f);transition:width .35s ease}
 #hBar.over{background:linear-gradient(90deg,#ffb02e,#9cff57)}
 #hScore{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12.5px;font-variant-numeric:tabular-nums;text-shadow:0 1px 2px #0008}
@@ -133,12 +134,12 @@ h3{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute
       <button class="chipbtn" id="hudExp" type="button">Export</button>
       <button class="chipbtn" id="muteBtn" type="button">Sound on</button>
     </div>
-    <div class="bar"><div id="hBar"></div><span id="hScore">0 / 0</span></div>
+    <div class="bar"><div id="hGhost"></div><div id="hBar"></div><span id="hScore">0 / 0</span></div>
     <div class="row"><div id="hDrops"></div><span id="hZone"></span><div class="spacer"></div><div id="hMod"></div></div>
   </header>
   <div id="itemBar" aria-label="Your items"></div>
-  <div id="stage"><canvas id="cv" aria-label="Board of Torment. Drag along the top to pick a spot, drag down to tilt the angle, hold still to charge, release to launch."></canvas></div>
-  <div id="liveRow"><div id="live">Drag to aim, hold to charge, release</div><button id="bankBtn" type="button" hidden>End round</button></div>
+  <div id="stage"><canvas id="cv" aria-label="Board of Torment. Pull the plunger down and release to launch a soul up the lane."></canvas></div>
+  <div id="liveRow"><div id="live">Pull down anywhere, release to launch</div><button id="bankBtn" type="button" hidden>End round</button></div>
   <div id="tray"></div>
   <div id="info"></div>
 </div>
@@ -146,7 +147,7 @@ h3{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute
 
 <script>
 (()=>{
-const W=400,H=660,DROP_Y=62,BT=598,NB=7,BW=W/NB,BASE_R=7,FINAL=60,LAUNCH=320,MAX_ANG=1.05;
+const W=400,H=660,PW=362,LX=381,LANE_TOP=98,HEAD_Y=626,ARC_R=13.5,ARC_CX=367.5,ARC_Y=80,DROP_Y=62,BT=598,NB=7,BW=PW/NB,BASE_R=7,FINAL=60,LAUNCH=320,MAX_ANG=1.05;
 const SPECIAL={mult:'#9cff57',gold:'#ffd54a',bumper:'#b26bff',splitter:'#5ce1ff',crit:'#ff4fd8',bomb:'#ff6a00'};
 const SPECIAL_GLYPH={mult:'×',gold:'$',bumper:'',splitter:'Y',crit:'!',bomb:'*'};
 const PEGINFO=[['num','Torment pegs: give their value in suffering, then halve. Pop at 0'],['mult','Wrath sigil: +1 mult'],['gold','Coin sigil: +1 soul coin'],['bumper','Rubber sigil: big bounce'],['splitter','Split sigil: splits the soul'],['crit','Agony sigil: doubles mult'],['bomb','Sulfur sigil: blast, once a round']];
@@ -189,7 +190,7 @@ const ITEMS=[
  {id:'coupon',n:'Employee Discount',g:'%',r:1,trig:'passive',d:()=>'Commissary and canteen prices are 20% lower'},
  {id:'hopper',n:'Extra Chute',g:'+1',r:2,trig:'passive',d:()=>'+1 drop every round'},
  {id:'clover',n:'Cursed Clover',g:'4L',r:1,trig:'hit',d:L=>`${8*L}% chance the hit scores double`,fn:(L,c)=>{if(rnd()<.08*L)c.dbl=true}},
- {id:'ghost',n:'Doppelgänger',g:'GB',r:2,trig:'start',d:L=>`${20*L}% chance to launch a second soul`,fn:L=>{if(rnd()<.2*L)spawn(aimX,DROP_Y,(rnd()-.5)*160,LAUNCH*.6)}},
+ {id:'ghost',n:'Doppelgänger',g:'GB',r:2,trig:'start',d:L=>`${20*L}% chance to launch a second soul`,fn:L=>{if(rnd()<.2*L)spawn(exitX(),ARC_Y-ARC_R,-(150+rnd()*500),-80)}},
  {id:'compass',n:'Lost Compass',g:'Cm',r:2,trig:'land',d:L=>`Landing in an outer bucket: ×${1+L*.5} mult`,fn:(L,c)=>{if(c.bucket===0||c.bucket===6)D.mult*=1+L*.5}},
  {id:'battery',n:'Lightning Rod',g:'Bt',r:1,trig:'wallN',every:3,d:L=>`+${2*L} mult`,fn:L=>addMult(2*L)},
  {id:'metronome',n:'Drumbeat of Doom',g:'Mt',r:1,trig:'hitN',every:5,d:L=>`+${6*L} points`,fn:L=>addPts(6*L)},
@@ -276,7 +277,20 @@ function save(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 let st=null,D=null,balls=[],pops=[],aimX=W/2,aimAng=0,dragging=false,sel=null,shake=0,depth=0,chargeStart=0,anchor=null;
-const chargeNow=()=>dragging?Math.min(1,(performance.now()-chargeStart)/1100):0;
+let pull=0,pullY=0,maxSince=0,kbPull=false;
+const chargeNow=()=>dragging&&maxSince?Math.min(1,(performance.now()-maxSince)/700):0;
+const exitX=()=>PW-ballR()-1;
+const restY=()=>HEAD_Y-ballR();
+function pathLen(){return (restY()-ARC_Y)+Math.PI/2*ARC_R+(ARC_CX-exitX())}
+function pathPos(d){const s1=restY()-ARC_Y;if(d<s1)return {x:LX,y:restY()-d};d-=s1;const al=Math.PI/2*ARC_R;
+  if(d<al){const a=d/ARC_R;return {x:ARC_CX+ARC_R*Math.cos(a),y:ARC_Y-ARC_R*Math.sin(a)}}d-=al;return {x:ARC_CX-d,y:ARC_Y-ARC_R}}
+const launchV=pw=>({vx:-(70+780*pw),vy:-(30+230*pw)});
+function finishLaunch(){
+  const A=st.launchAnim;st.launchAnim=null;const v=launchV(A.pow),j=.97+rnd()*.06;
+  spawn(exitX(),ARC_Y-ARC_R,v.vx*j,v.vy);
+  if(A.hell){balls[balls.length-1].fire=5;popup(exitX()-30,ARC_Y+20,'HELLFIRE SOUL','#ff6a00',22);shake=8;flash('#ff6a00',.3);burst(exitX(),ARC_Y-ARC_R,'#ff6a00',30,260,3)}
+  blip(500+A.pow*500,.1,'sine',.06);
+}
 let best=load('pegmancer.best2',{round:0,drop:0});
 const has=id=>!!(st&&st.inv&&st.inv.some(x=>x.id===id));
 const hasPerk=id=>!!(st&&st.perks&&st.perks.includes(id));
@@ -305,7 +319,7 @@ function layoutSlots(z){
       if(z===1&&Math.hypot(x-200,(y-334)*1.15)<70)continue;
       if(z===2)y+=14*Math.cos((x-200)/200*Math.PI*.9)-6;
       if(z===3){x+=(rnd()-.5)*10;y+=(rnd()-.5)*10}
-      pts.push({x:Math.max(12,Math.min(W-12,x)),y});
+      pts.push({x:Math.max(12,Math.min(PW-12,x*PW/W)),y});
     }
   }
   return pts;
@@ -422,22 +436,21 @@ function startRound(){
   st.dropsMax=Math.max(1,5+(has('hopper')?1:0)+(has('clock')?2:0)-(st.mod&&st.mod.id==='short'?1:0));
   st.dropsLeft=st.dropsMax;st.dropNo=0;st.roundScore=0;st.quipLevel=0;st.restocksRound=0;st.quotaHit=false;st.roundBonus=0;
   D={points:0,mult:1};fire('round',{});D=null;
-  st.tgt=target();st.phase='aim';balls=[];aimAng=0;
-  setLive('Drag to aim, hold to charge, release');hideOv();renderTray();renderBar();
+  st.tgt=target();st.phase='aim';balls=[];st.launchAnim=null;pull=0;dragging=false;
+  setLive('Pull down anywhere, release to launch');hideOv();renderTray();renderBar();
 }
 function gravity(){let g=950;if(has('kite'))g*=.8;if(st.mod&&(st.mod.id==='heavy'||st.mod.id==='foreman'))g*=1.4;return g}
 function ballR(){return st&&has('core')?BASE_R*1.35:BASE_R}
 function spawn(x,y,vx,vy){if(balls.filter(b=>b.alive).length>=16)return;balls.push({x,y,vx,vy,alive:true,t:0,still:0,bin:-1,trail:[],lastWall:-1})}
-function tryDrop(ch=0){
+function tryDrop(pw=.5,ch=0){
   if(!st||st.phase!=='aim'||st.dropsLeft<=0)return;
   st.phase='falling';st.dropNo++;sel=null;renderTray();if(tally)tally.t=Math.max(tally.t,1.6);liveBump.lp=0;liveBump.lm=1;
   D={points:0,mult:1,hits:0,pops:0,walls:0,bucket:0,bucketBonus:0,firstPop:false,cleared:false,triple:0,espresso:st.espresso};st.espresso=false;
   st.pegs.forEach(p=>p.used=false);
   if(st.mod&&st.mod.id==='gardener')shuffle(numPegs()).slice(0,6).forEach(p=>{p.kind=null;p.v=0});
   if(st.mod&&st.mod.id==='astronomer')st.bucketOrder=shuffle([0,1,2,3,4,5,6]);
-  const spd=LAUNCH*(.75+.5*ch);spawn(aimX,DROP_Y,Math.sin(aimAng)*spd,Math.cos(aimAng)*spd*.6);
-  if(ch>=1){balls[balls.length-1].fire=5;popup(aimX,DROP_Y+28,'HELLFIRE SOUL','#ff6a00',22);shake=8;flash('#ff6a00',.3);burst(aimX,DROP_Y,'#ff6a00',30,260,3)}
-  D.charge=ch;
+  st.launchAnim={d:0,pow:pw,hell:ch>=1,speed:1100+2400*pw};
+  D.charge=ch;D.power=pw;
   fire('start',{});
   if(hasPerk('ignition'))forceTrigger(1,1);
   if(hasPerk('early')&&st.dropNo===1)forceTrigger('first',3);
@@ -453,7 +466,7 @@ function hitPeg(p,b,blast){
   const c={peg:p,ball:b,dbl:false,again:false};
   fire('hit',c);
   switch(p.kind){
-    case 'mult':{const m=1+st.perm.red;D.mult+=m;popup(p.x,p.y-12,'+'+fmt(m)+' mult',SPECIAL.mult,15);burst(p.x,p.y,SPECIAL.mult,14,170);blip(330);break}
+    case 'mult':{const m=1+st.perm.red;D.mult+=m;popup(p.x,p.y-12,'+'+fmt(m)+' MULT',SPECIAL.mult,18);burst(p.x,p.y,SPECIAL.mult,14,170);blip(330);break}
     case 'gold':{const tax=st.mod&&st.mod.id==='tax';if(!tax){st.coins++;popup(p.x,p.y-12,'+1c',SPECIAL.gold,13);burst(p.x,p.y,SPECIAL.gold,10,140)}addPts(1);blip(880);break}
     case 'bumper':addPts(2);fire('bump',c);burst(p.x,p.y,SPECIAL.bumper,8,200);blasts.push({x:p.x,y:p.y,r:22,t:0,c:SPECIAL.bumper});blip(260);break;
     case 'splitter':if(!p.used&&b){p.used=true;spawn(b.x,b.y,(rnd()<.5?-1:1)*(140+rnd()*60),-60);popup(p.x,p.y-12,'Split!',SPECIAL.splitter,13);blip(660)}break;
@@ -520,7 +533,7 @@ function finishDrop(){
   if(D.espresso){s*=3;tags.push('Espresso ×3')}
   if(has('abyss'))st.pegs.forEach(p=>{if(p.kind==='num'){p.v=Math.floor(p.v/2);if(p.v<=0){p.kind=null;p.v=0}}});
   s=Math.floor(s);
-  st.log.drops.push({r:st.round,d:st.dropNo,pts:+D.points.toFixed(1),mult:+D.mult.toFixed(2),bucket:+D.bucket.toFixed(2),hits:D.hits,pops:D.pops,score:s,ang:Math.round(aimAng*57.3),ch:+(D.charge||0).toFixed(2),tags});
+  st.log.drops.push({r:st.round,d:st.dropNo,pts:+D.points.toFixed(1),mult:+D.mult.toFixed(2),bucket:+D.bucket.toFixed(2),hits:D.hits,pops:D.pops,score:s,pow:Math.round((D.power||0)*100),hell:D.charge>=1,tags});
   st.roundScore+=s;st.dropsLeft--;st.bestDrop=Math.max(st.bestDrop,s);
   if(s>best.drop){best.drop=s;save('pegmancer.best2',best)}
   tally={pts:D.points,mult:D.mult,bucket:Math.max(D.bucket,.5),total:s,t:0,stamped:false,tick:0};
@@ -584,7 +597,7 @@ function legendHTML(){return '<div class="legend">'+PEGINFO.map(([t,l])=>`<div><
 function showTitle(){
   showOv(`<div class="logo">PEG<br>MANCER</div>
   <div class="tag">You are a lowly devil intern. Launch damned souls down the Boards of Torment and make quota, or the Infernal Auditor will unmake you.</div>
-  <div class="how"><p><b>Aim:</b> drag along the top to pick a spot, drag down into the board to tilt the angle. <b>Hold still to charge.</b> A full charge launches a Hellfire soul that burns the first 5 pegs it hits. Release to launch.</p>
+  <div class="how"><p><b>Launch:</b> pull down anywhere on the board to draw back the plunger, then release. The soul shoots up the lane on the right and over the top. A harder pull sends it further left. <b>Hold a full pull</b> until it glows to launch a Hellfire soul that burns the first 5 pegs it hits.</p>
   <p>Each launch scores <b>suffering × mult × bucket</b>. A torment peg gives its value, then halves. At 0 it pops.</p>
   <p>Every time your round total passes quota again, a <b>fresh consignment of the damned</b> arrives: empty slots refill, matching neighbours fuse into greater sinners, and you get a soul coin.</p>
   <p>Relics in the bar above the board fire on their trigger, left to right. Order matters. Miss quota and you lose a chance. Survive ${FINAL} rounds to make Pegmancer.</p></div>
@@ -702,7 +715,7 @@ function showClaw(head,lines){
    <button class="big" id="grabBtn" type="button">Grab (3 left)</button><div class="next" id="clawMsg">&nbsp;</div>
    <button class="chipbtn" id="contBtn" type="button">Skip to round ${st.round+1}</button>`);
   const hand=$('hand'),prz=$('prz');
-  const tick=()=>{if(ov.hidden)return;pos+=dir*.012;if(pos>1){pos=1;dir=-1}if(pos<0){pos=0;dir=1}hand.style.left=`calc(10px + ${pos} * (100% - 20px))`;raf=requestAnimationFrame(tick)};tick();
+  const tick=()=>{if(ov.hidden||grabs<=0)return;pos+=dir*.012;if(pos>1){pos=1;dir=-1}if(pos<0){pos=0;dir=1}hand.style.left=`calc(10px + ${pos} * (100% - 20px))`;raf=requestAnimationFrame(tick)};tick();
   $('grabBtn').onclick=()=>{
     if(busy||grabs<=0)return;busy=true;grabs--;
     const boxes=[...prz.children],hr=hand.getBoundingClientRect(),cx=hr.left+hr.width/2;
@@ -779,7 +792,7 @@ function summaryText(){
   for(const r of rounds){
     const R=L.rounds.find(x=>x.r===r);
     o.push(R?`Round ${r}${R.mod?' ['+R.mod+']':''}: ${fmtInt(R.score)} / ${fmtInt(R.target)} in ${R.dropsUsed}/${R.dropsMax} drops, ${R.won?'won':'MISSED'}, ${R.restocks} restocks, coins after ${R.coinsAfter}, lives ${R.lives}`:`Round ${r}: in progress`);
-    L.drops.filter(d=>d.r===r).forEach(d=>o.push(`  drop ${d.d}: ${fmt(d.pts)} pts × ${fmt(d.mult)} mult × ${fmt(d.bucket)} = ${fmtInt(d.score)} (${d.hits} hits, ${d.pops} pops, angle ${d.ang}°)${d.tags.length?' ['+d.tags.join(', ')+']':''}`));
+    L.drops.filter(d=>d.r===r).forEach(d=>o.push(`  drop ${d.d}: ${fmt(d.pts)} pts × ${fmt(d.mult)} mult × ${fmt(d.bucket)} = ${fmtInt(d.score)} (${d.hits} hits, ${d.pops} pops, plunger ${d.pow}%${d.hell?', HELLFIRE':''})${d.tags.length?' ['+d.tags.join(', ')+']':''}`));
     L.events.filter(e=>e.r===r).forEach(e=>o.push('  · '+e.e));
   }
   o.push('');o.push('DATA (for changes)');
@@ -813,7 +826,7 @@ window.pegmancerBack=()=>{
 
 // ---------- HUD, item bar, tray ----------
 function setLive(h){$('live').innerHTML=h}
-let hudKey='';
+let hudKey='',hudGhost='';
 function updateHud(){
   if(!st)return;
   const k=[st.round,st.tgt,st.coins,st.roundScore,st.dropsLeft,st.dropsMax,st.lives,st.maxLives,st.mod&&st.mod.id,st.quotaHit,st.phase].join('|');
@@ -900,7 +913,7 @@ function step(dt){
     const sp=Math.hypot(b.vx,b.vy);if(sp>950){b.vx*=950/sp;b.vy*=950/sp}
     b.x+=b.vx*dt;b.y+=b.vy*dt;
     if(b.x<r){b.x=r;b.vx=Math.abs(b.vx)*.7;wallHit(b)}
-    if(b.x>W-r){b.x=W-r;b.vx=-Math.abs(b.vx)*.7;wallHit(b)}
+    if(b.x>PW-r){b.x=PW-r;b.vx=-Math.abs(b.vx)*.7;wallHit(b)}
     if(b.y<r&&b.vy<0){b.y=r;b.vy=Math.abs(b.vy)*.5}
     if(b.y<BT){for(const p of st.pegs){if(!p.kind||p.off)continue;if(collide(b,p,pegR(p),r))hitPeg(p,b)}}
     for(const p of posts)collide(b,p,4,r);
@@ -920,23 +933,25 @@ function wallHit(b){
   if(hasPerk('rebound'))forceTrigger('last',1,c);
 }
 
-// ---------- input: drag along the top for position, drag down for angle ----------
+// ---------- input: pull the plunger down anywhere, release to launch ----------
 function boardPt(e){const rc=cv.getBoundingClientRect();return {x:(e.clientX-rc.left)/scale,y:(e.clientY-rc.top)/scale}}
-function aimFrom(pt){
-  if(pt.y<DROP_Y+24){aimX=Math.max(12,Math.min(W-12,pt.x))}
-  else{const dx=pt.x-aimX,dy=pt.y-DROP_Y;aimAng=Math.max(-MAX_ANG,Math.min(MAX_ANG,Math.atan2(dx,dy)));if(Math.abs(aimAng)<.05)aimAng=0}
+function setPull(v){pull=Math.max(0,Math.min(1,v));if(pull>=.98){if(!maxSince)maxSince=performance.now()}else maxSince=0}
+function release(){
+  if(!dragging)return;const ch=chargeNow(),pw=pull;dragging=false;kbPull=false;pull=0;maxSince=0;
+  if(!st||st.phase!=='aim')return;
+  if(pw<.04){setLive('Pull further down, then release');return}
+  tryDrop(pw,ch);
 }
 cv.addEventListener('pointerdown',e=>{
   initAudio();if(!st||!st.log||st.phase!=='aim')return;
-  dragging=true;const pt=boardPt(e);aimFrom(pt);anchor=pt;chargeStart=performance.now();cv.setPointerCapture&&cv.setPointerCapture(e.pointerId);
+  dragging=true;pullY=boardPt(e).y;setPull(0);cv.setPointerCapture&&cv.setPointerCapture(e.pointerId);
 });
-cv.addEventListener('pointermove',e=>{if(st&&st.phase==='aim'&&dragging){const pt=boardPt(e);aimFrom(pt);if(!anchor||Math.hypot(pt.x-anchor.x,pt.y-anchor.y)>5){anchor=pt;chargeStart=performance.now()}}});
-cv.addEventListener('pointerup',()=>{if(dragging&&st&&st.phase==='aim'){const ch=chargeNow();dragging=false;tryDrop(ch)}dragging=false});
-cv.addEventListener('pointercancel',()=>dragging=false);
+cv.addEventListener('pointermove',e=>{if(st&&st.phase==='aim'&&dragging&&!kbPull){const y=boardPt(e).y;setPull((y-pullY)/170)}});
+cv.addEventListener('pointerup',release);
+cv.addEventListener('pointercancel',()=>{dragging=false;pull=0;maxSince=0});
 window.addEventListener('keydown',e=>{if(!st||!st.log||!ov.hidden||st.phase!=='aim')return;
-  if(e.key==='ArrowLeft')aimX=Math.max(12,aimX-8);if(e.key==='ArrowRight')aimX=Math.min(W-12,aimX+8);
-  if(e.key==='q'||e.key==='Q')aimAng=Math.min(MAX_ANG,aimAng+.05);if(e.key==='e'||e.key==='E')aimAng=Math.max(-MAX_ANG,aimAng-.05);
-  if(e.key===' '||e.key==='Enter'){e.preventDefault();tryDrop()}});
+  if((e.key===' '||e.key==='Enter'||e.key==='ArrowDown')&&!kbPull){e.preventDefault();kbPull=true;dragging=true;setPull(0)}});
+window.addEventListener('keyup',e=>{if(kbPull&&(e.key===' '||e.key==='Enter'||e.key==='ArrowDown')){e.preventDefault();release()}});
 
 // ---------- render ----------
 function resize(){
@@ -966,22 +981,36 @@ function draw(t){
   ctx.fillStyle='#ffffff0d';ctx.fillRect(0,DROP_Y-18,W,36);
   if(st&&st.phase==='falling'&&D){
     ctx.textAlign='left';ctx.fillStyle='#c59a87';ctx.font='800 9px Nunito, sans-serif';ctx.fillText('SUFFERING',12,DROP_Y-22);
-    ctx.textAlign='right';ctx.fillText('MULT',W-12,DROP_Y-22);ctx.textAlign='center';ctx.fillText(D.hits+' HITS · '+D.pops+' POPS',W/2,DROP_Y-22);
+    ctx.textAlign='right';ctx.fillText('MULT',PW-12,DROP_Y-22);ctx.textAlign='center';ctx.fillText(D.hits+' HITS · '+D.pops+' POPS',PW/2,DROP_Y-22);
     ctx.font=Math.round(28*(1+.4*liveBump.p))+'px "Lilita One", sans-serif';ctx.textAlign='left';ctx.fillStyle='#ffb02e';ctx.shadowColor='#ff6a00';ctx.shadowBlur=10*liveBump.p;
     ctx.fillText(fmt(D.points),12,DROP_Y+12);
     ctx.font=Math.round(28*(1+.4*liveBump.m))+'px "Lilita One", sans-serif';ctx.textAlign='right';ctx.fillStyle='#9cff57';ctx.shadowColor='#9cff57';ctx.shadowBlur=10*liveBump.m;
-    ctx.fillText('×'+fmt(D.mult),W-12,DROP_Y+12);ctx.shadowBlur=0;
-    if(D.hits>=10){ctx.textAlign='center';ctx.font=Math.round(16+Math.min(14,D.hits/4))+'px "Lilita One", sans-serif';ctx.fillStyle=D.hits>=40?'#ff3b2f':D.hits>=25?'#ffb02e':'#fbe9dc';ctx.fillText(D.hits>=40?'FRENZY!':D.hits>=25?'TORMENT STREAK':'COMBO',W/2,DROP_Y+12)}
-  }else{ctx.fillStyle='#c59a87';ctx.font='800 9px Nunito, sans-serif';ctx.textAlign='left';ctx.fillText('SOUL CHUTE · DRAG TO MOVE · DRAG DOWN TO ANGLE · HOLD TO CHARGE',8,DROP_Y-22)}
-  if(st&&st.phase==='aim'&&st.log){
-    // trajectory guide
-    const vx=Math.sin(aimAng)*LAUNCH,vy=Math.cos(aimAng)*LAUNCH*.6,g=gravity();
-    ctx.fillStyle='#ffffff55';
-    for(let i=1;i<14;i++){const tt=i*.035,x=aimX+vx*tt,y=DROP_Y+vy*tt+.5*g*tt*tt;if(y>BT)break;circle(Math.max(4,Math.min(W-4,x)),y,2.2-i*.1);ctx.fill()}
-    const bob=Math.sin(t/220)*2,ch=chargeNow();drawSoul(aimX,DROP_Y+bob,ballR(),ch>=1,0,t);
-    if(ch>0){ctx.strokeStyle=ch>=1?'#ff6a00':'#ffb02e';ctx.lineWidth=3;ctx.beginPath();ctx.arc(aimX,DROP_Y+bob,ballR()+6,-Math.PI/2,-Math.PI/2+Math.PI*2*ch);ctx.stroke();
-      if(ch>=1){ctx.fillStyle='#ff6a00';ctx.font='800 10px Nunito, sans-serif';ctx.textAlign='center';ctx.fillText('HELLFIRE READY',aimX,DROP_Y+ballR()+20)}}
-    if(aimAng){ctx.fillStyle='#ffc93c';ctx.font='800 11px Nunito, sans-serif';ctx.textAlign='center';ctx.fillText(Math.round(-aimAng*57.3)+'°',aimX,DROP_Y-6-ballR())}
+    ctx.fillText('×'+fmt(D.mult),PW-12,DROP_Y+12);ctx.shadowBlur=0;
+    {const prod=D.points*D.mult,ratio=(st.roundScore+prod)/st.tgt,sz=Math.min(34,20+Math.log10(prod+1)*3.5)*(1+.25*Math.max(liveBump.p,liveBump.m));
+     ctx.textAlign='center';ctx.font=Math.round(sz)+'px "Lilita One", sans-serif';ctx.fillStyle=ratio>=1?'#9cff57':ratio>=.5?'#ffb02e':'#fbe9dc';ctx.shadowColor=ctx.fillStyle;ctx.shadowBlur=ratio>=1?14:0;
+     ctx.fillText('= '+fmt(prod),PW/2,DROP_Y+12);ctx.shadowBlur=0}
+  }else{ctx.fillStyle='#c59a87';ctx.font='800 9px Nunito, sans-serif';ctx.textAlign='left';ctx.fillText('PULL DOWN ANYWHERE, RELEASE TO LAUNCH',8,DROP_Y-22)}
+  if(st&&st.phase==='aim'&&st.log&&dragging&&pull>.02){
+    // landing preview from the top of the lane
+    const v=launchV(pull),g=gravity(),r0=ballR();let x=exitX(),y=ARC_Y-ARC_R,vx=v.vx,vy=v.vy;
+    ctx.fillStyle=chargeNow()>=1?'#ff6a00aa':'#ffffff66';
+    for(let i=1;i<=22;i++){const dt=.03;vy+=g*dt;x+=vx*dt;y+=vy*dt;if(x<r0){x=2*r0-x;vx=-vx*.7}if(y>BT)break;if(i%2===0){circle(x,y,2.4-i*.05);ctx.fill()}}
+    ctx.textAlign='center';ctx.font='18px "Lilita One", sans-serif';ctx.fillStyle=chargeNow()>=1?'#ff6a00':'#ffb02e';
+    ctx.fillText(chargeNow()>=1?'HELLFIRE READY':'POWER '+Math.round(pull*100)+'%',PW/2,DROP_Y+8);
+  }
+  // launch lane and plunger
+  ctx.fillStyle='#0e0403';ctx.fillRect(PW,LANE_TOP-20,W-PW,H-LANE_TOP+20);
+  ctx.strokeStyle='#5a2318';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(PW,LANE_TOP);ctx.lineTo(PW,H);ctx.stroke();
+  ctx.beginPath();ctx.arc(ARC_CX,ARC_Y,ARC_R+ballR()+2,-Math.PI/2,0);ctx.lineTo(W-1,H);ctx.stroke();
+  if(st&&st.log){
+    const pl=st.phase==='aim'?pull:0,head=HEAD_Y+pl*28,hot=chargeNow()>=1;
+    ctx.strokeStyle=hot?'#ff6a00':'#c59a87';ctx.lineWidth=2;ctx.beginPath();
+    const coils=7,top=head+6,bot=H-3;for(let i=0;i<=coils*2;i++){const yy=top+(bot-top)*i/(coils*2);ctx.lineTo(LX+(i%2?8:-8),yy)}ctx.stroke();
+    ctx.fillStyle=hot?'#ff6a00':'#ffb02e';ctx.fillRect(LX-12,head,24,6);
+    if(hot){ctx.shadowColor='#ff6a00';ctx.shadowBlur=16;ctx.fillRect(LX-12,head,24,6);ctx.shadowBlur=0}
+    if(st.phase==='aim')drawSoul(LX,head-ballR(),ballR(),hot,0,t);
+    if(st.launchAnim){const q=pathPos(st.launchAnim.d);drawSoul(q.x,q.y,ballR(),st.launchAnim.hell,999,t)}
+    if(st.phase==='aim'&&!dragging){ctx.fillStyle='#c59a87';ctx.font='800 9px Nunito, sans-serif';ctx.textAlign='center';ctx.save();ctx.translate(LX,LANE_TOP+60);ctx.rotate(-Math.PI/2);ctx.fillText('▼ PULL',0,3);ctx.restore()}
   }
   // pegs
   if(st&&st.pegs)for(const p of st.pegs){
@@ -1023,6 +1052,8 @@ function draw(t){
     b.trail.push(b.x,b.y);if(b.trail.length>16)b.trail.splice(0,2);
     for(let i=0;i<b.trail.length;i+=2){ctx.fillStyle=`rgba(255,170,120,${i/b.trail.length*.35})`;circle(b.trail[i],b.trail[i+1],r*(i/b.trail.length));ctx.fill()}
     drawSoul(b.x,b.y,r,b.fire>0,Math.hypot(b.vx,b.vy),t);
+    if(D&&D.hits>=5&&b===anyBall()){const h=D.hits,c=h>=40?'#ff3b2f':h>=25?'#ffb02e':'#fbe9dc';ctx.font=Math.round(12+Math.min(16,h/3))+'px "Lilita One", sans-serif';ctx.textAlign='left';ctx.lineWidth=4;ctx.strokeStyle='#140806';const tx=b.x+r+4>PW-40?b.x-r-40:b.x+r+4;ctx.strokeText(h+'×',tx,b.y-r-2);ctx.fillStyle=c;ctx.fillText(h+'×',tx,b.y-r-2);
+      if(h>=25){ctx.font='800 9px Nunito, sans-serif';ctx.fillStyle=c;ctx.fillText(h>=40?'FRENZY':'STREAK',tx,b.y-r+9)}}
   }
   // popups
   ctx.textAlign='center';
@@ -1059,17 +1090,25 @@ function draw(t){
 let last=performance.now();
 function frame(t){
   const dt=Math.min(.033,(t-last)/1000);last=t;
+  if(st&&st.launchAnim){const A=st.launchAnim;A.d+=A.speed*dt;if(rnd()<.6)parts.push({x:pathPos(A.d).x,y:pathPos(A.d).y,vx:(rnd()-.5)*20,vy:20,life:0,max:.3,color:A.hell?'#ff6a00':'#ffb02e',size:2,grav:0});if(A.d>=pathLen())finishLaunch()}
+  if(kbPull&&st&&st.phase==='aim')setPull(pull+dt*1.1);
   if(st&&st.log&&(st.phase==='falling'||balls.some(b=>b.alive))){
     for(let i=0;i<5;i++)step(dt/5);
     if(st.phase==='falling'&&D){
       if(balls.some(b=>b.alive))setLive(`<span>${fmt(D.points)}</span> <span class="x">× ${fmt(D.mult)}</span> <small>${D.hits} hits · ${D.pops} pops</small>`);
-      else{balls=[];finishDrop()}
+      else if(!st.launchAnim){balls=[];finishDrop()}
     }
   }
   pops.forEach(p=>p.t+=dt*.9);pops=pops.filter(p=>p.t<1);
   blasts.forEach(b=>b.t+=dt*2.5);for(let i=blasts.length-1;i>=0;i--)if(blasts[i].t>=1)blasts.splice(i,1);
   for(let i=parts.length-1;i>=0;i--){const q=parts[i];q.life+=dt;if(q.life>=q.max){parts.splice(i,1);continue}q.vy+=q.grav*dt;q.x+=q.vx*dt;q.y+=q.vy*dt}
   if(D&&st&&st.phase==='falling'){if(D.points!==liveBump.lp){liveBump.p=1;liveBump.lp=D.points}if(D.mult!==liveBump.lm){liveBump.m=1;liveBump.lm=D.mult}}
+  if(D&&st&&st.phase==='falling'){
+    const prod=D.points*D.mult,ratio=(st.roundScore+prod)/st.tgt;
+    const MS=[[.5,'HALFWAY THERE','#fbe9dc'],[1,'QUOTA IN REACH','#9cff57'],[2,'DOUBLE QUOTA','#9cff57'],[5,'FIVE TIMES QUOTA','#ffb02e'],[10,'TEN TIMES QUOTA!','#ffb02e'],[50,'UNHOLY NUMBERS','#ff3b2f'],[250,'THE AUDITOR WEEPS','#ff3b2f']];
+    D.ms=D.ms||0;while(D.ms<MS.length&&ratio>=MS[D.ms][0]){const m=MS[D.ms];if(m[0]>(st.roundScore/st.tgt)){popup(PW/2,BT-110,m[1],m[2],m[0]>=5?26:22);if(m[0]>=1){flash(m[2],.18);burst(PW/2,BT-110,m[2],24,220)}chord(m[0]>=5?[659,880,1175]:[523,784])}D.ms++}
+    const gw=Math.min(100,ratio*100)+'%';if(hudGhost!==gw){hudGhost=gw;$('hGhost').style.width=gw}
+  }else if(hudGhost!=='0%'){hudGhost='0%';$('hGhost').style.width='0%'}
   liveBump.p=Math.max(0,liveBump.p-dt*5);liveBump.m=Math.max(0,liveBump.m-dt*5);
   if(tally){const T=tally;T.t+=dt;
     if(!T.stamped&&T.t<.8){T.tick+=dt;if(T.tick>.06){T.tick=0;lastBlip=0;blip(300+T.t*900,.04,'square',.025)}}
