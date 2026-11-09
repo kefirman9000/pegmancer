@@ -48,19 +48,21 @@ button:disabled{cursor:default}
 #hMod.soon{color:var(--gold)}
 /* item bar on top of the board */
 #itemBar .it.frozen{opacity:.35;filter:grayscale(1);border-style:dashed}
-#itemBar{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;height:34px;flex:none;align-items:stretch}
+#itemBar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;height:46px;flex:none;padding:0 1px}
 #itemBar::-webkit-scrollbar{display:none}
-.it{flex:none;display:flex;align-items:center;gap:4px;background:var(--panel);border:1.5px solid var(--line);border-radius:9px;padding:2px 6px 2px 3px;font-size:11px;font-weight:800;line-height:1.05;transition:background .12s,transform .12s;max-width:150px}
-.it .g{width:24px;height:24px;border-radius:7px;border:2px solid;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:11px;flex:none}
-.it .t{display:flex;flex-direction:column;min-width:0}
-.it .t span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.it .t small{color:var(--muted);font-weight:700;font-size:10px}
-.it .x{font-family:var(--display);font-size:14px;color:var(--gold)}
-.it.fire{background:var(--panel2);transform:translateY(-2px);border-color:var(--gold)}
-.it.sel{border-color:var(--fg)}
-.it.locked{border-style:solid;opacity:.3;width:auto;padding:0 6px;justify-content:center;color:var(--muted);font-size:10.5px}
-.it .burn{color:var(--teal);font-size:10px}
-.it.empty{border-style:dashed;opacity:.45;width:34px;justify-content:center;padding:0;color:var(--muted)}
+/* relic tiles: square-ish, rarity-coloured bevel, big glyph, level pips */
+.it{--rc:var(--line);position:relative;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:0;border-radius:10px;border:2px solid var(--rc);background:var(--panel);
+  background:linear-gradient(160deg,color-mix(in srgb,var(--rc) 22%,var(--panel)) 0%,var(--panel) 60%,color-mix(in srgb,#000 30%,var(--panel)) 100%);
+  box-shadow:inset 0 2px 0 #ffffff1a,inset 0 -3px 0 #0006,0 2px 0 #0008;color:var(--rc);font-weight:800;transition:transform .12s,box-shadow .12s,filter .12s}
+.it .g{font-family:var(--display);font-size:17px;line-height:1;letter-spacing:.02em;text-shadow:0 1px 0 #000a}
+.it .pips{display:flex;gap:3px}.it .pips i{width:5px;height:5px;border-radius:50%;background:#ffffff26}.it .pips i.on{background:var(--gold);box-shadow:0 0 4px var(--gold)}
+.it .ct{position:absolute;top:1px;right:3px;font-size:8.5px;color:var(--muted);font-weight:800;font-variant-numeric:tabular-nums}
+.it .burn{position:absolute;top:1px;left:3px;color:var(--teal);font-size:8.5px}
+.it.fire{transform:translateY(-3px) scale(1.06);box-shadow:inset 0 2px 0 #ffffff33,0 0 14px var(--rc),0 4px 0 #0008;filter:brightness(1.35)}
+.it.sel{outline:2px solid var(--fg);outline-offset:1px}
+.it.empty{border-style:dashed;opacity:.4;color:var(--muted);background:none;box-shadow:none;font-size:16px}
+.it.locked{opacity:.22;color:var(--muted);background:repeating-linear-gradient(135deg,#ffffff0d 0 4px,transparent 4px 8px);box-shadow:none;font-size:13px}
+#fx{position:fixed;inset:0;pointer-events:none;z-index:4}
 #stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;gap:4px;position:relative}
 canvas{display:block;border-radius:10px;touch-action:none}
 #liveRow{display:flex;align-items:center;gap:6px;height:30px;flex:none}
@@ -144,7 +146,7 @@ h3{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute
 @keyframes bump{0%{transform:scale(1.3)}60%{transform:scale(.97)}100%{transform:scale(1)}}
 .bump{animation:bump .4s ease-out}
 @media (max-width:420px){.offers.three{grid-template-columns:repeat(2,minmax(0,1fr))}.stat b{font-size:17px}}
-@media (max-height:700px){.stat b{font-size:16px}#itemBar{height:30px}.it .g{width:21px;height:21px;font-size:10px}.it .t small{display:none}#liveRow{height:26px}#live{font-size:17px;line-height:26px}}
+@media (max-height:700px){.stat b{font-size:16px}#itemBar{height:38px}.it .g{font-size:14px}.it .ct{display:none}#liveRow{height:26px}#live{font-size:17px;line-height:26px}}
 @media (prefers-reduced-motion:reduce){#hBar{transition:none}.it{transition:none}.bump{animation:none}}
 </style>
 
@@ -166,6 +168,7 @@ h3{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute
   <div id="liveRow"><div id="live">&nbsp;</div><button id="scrBtn" type="button" hidden aria-label="Scramble the board">⟳ 1</button><button id="bankBtn" type="button" hidden>End round</button><button id="fireBtn" type="button" hidden>Launch</button></div>
   <div id="tray"></div>
 </div>
+<canvas id="fx" aria-hidden="true"></canvas>
 <div id="ov" class="overlay" hidden><div class="card" id="ovCard"></div></div>
 
 <script>
@@ -232,7 +235,7 @@ const ITEMS=[
  {id:'kindred',n:'Kindred Torment',g:'KT',r:3,trig:'hitN',every:12,d:L=>`Hit every peg that shares the hit peg\'s value${L>1?`, ${L} times`:''}`,fn:(L,c)=>{if(!c.peg||!c.v0)return;const t=numPegs().filter(p=>p!==c.peg&&p.v===c.v0);for(let k=0;k<L;k++)echoHits(t,'#ff4fd8',c.peg)}},
  {id:'twin',n:'Twin Strike',g:'2x',r:1,trig:'hit',d:L=>`${10*L}% chance to also hit the nearest peg`,fn:(L,c)=>{if(c.peg&&rnd()<.1*L)echoHits(nearPegs(c.peg,1),'#ffe9c9',c.peg)}},
  {id:'shrapnel',n:'Bone Shrapnel',g:'Sh',r:1,trig:'pop',d:L=>`Hit the ${L>1?L+' pegs':'peg'} nearest the popped one`,fn:(L,c)=>{if(c.peg)echoHits(nearPegs(c.peg,L),'#ffb02e',c.peg)}},
- {id:'meteor',n:'Brimstone Meteor',g:'Me',r:2,trig:'tick',secs:2,d:L=>`Drop ${L} burning meteor${L>1?'s':''} from the top`,fn:L=>{for(let k=0;k<L;k++){const x=30+rnd()*(W-60);spawn(x,DROP_Y,(rnd()-.5)*80,60);const m=balls[balls.length-1];if(m){m.fire=2;m.meteor=true}}}},
+ {id:'meteor',n:'Brimstone Meteor',g:'Me',r:2,trig:'tick',secs:2,d:L=>`Drop ${L} burning meteor${L>1?'s':''} from the top`,fn:L=>{const tx=tileBoardX(curItem);for(let k=0;k<L;k++){const x=Math.max(20,Math.min(W-20,tx+(k-(L-1)/2)*22));fxBeam(curItem,x,DROP_Y,'#ff6a00');spawn(x,DROP_Y,(rnd()-.5)*80,60);const m=balls[balls.length-1];if(m){m.fire=2;m.meteor=true}}}},
  {id:'imps',n:'Imp Swarm',g:'Im',r:1,trig:'firstPop',d:L=>`Release ${L+1} imps from the popped peg`,fn:(L,c)=>{if(c.peg)for(let k=0;k<L+1;k++)spawn(c.peg.x,c.peg.y,(rnd()-.5)*300,-120-rnd()*120)}},
  {id:'anvil',n:'Judgment Hammer',g:'An',r:2,trig:'end',d:L=>`Crush the ${L>1?L+' columns':'column'} under your biggest peg${L>1?'s':''}, popping every peg at full value`,fn:L=>{numPegs().sort((a,b)=>b.v-a.v).slice(0,L).forEach(top=>{const x=top.x;zaps.push({x1:x,y1:0,x2:x,y2:BT,t:0,c:'#c9c9d6'});shake=10;numPegs().filter(q=>Math.abs(q.x-x)<14).forEach(q=>{addPts(q.v);popPeg(q,null)})})}},
  {id:'fuse',n:'Lit Fuse',g:'LF',r:1,trig:'pop',d:L=>`${15*L}% chance a popped peg bursts, hitting everything next to it`,fn:(L,c)=>{if(c.peg&&rnd()<.15*L){const p=c.peg;blasts.push({x:p.x,y:p.y,r:45,t:0,c:'#ff6a00'});echoHits(numPegs().filter(q=>Math.hypot(q.x-p.x,q.y-p.y)<52),'#ff6a00',p)}}},
@@ -252,6 +255,9 @@ const ITEMS=[
  {id:'puppet',n:'Puppet of Penance',g:'PP',r:1,trig:'hit',d:L=>`Points equal to ${L>1?L+'× ':''}the hits this launch so far ÷ 5`,fn:L=>addPts(Math.floor(D.hits/5)*L)},
  {id:'relay',n:'Relay Totem',g:'RT',r:2,trig:'forced',d:L=>`Passes the trigger to both neighbours. Each success lowers the odds by ${Math.round(20/L)}% until next round`,fn:()=>{}},
  {id:'starspawn',n:'Star-Spawn',g:'✶',r:2,trig:'dblN',every:3,d:L=>`A random peg bursts, hitting ${3+L} pegs around it`,fn:L=>{const p=pick(numPegs());if(p){blasts.push({x:p.x,y:p.y,r:40,t:0,c:'#a46bff'});echoHits([p].concat(nearPegs(p,2+L)),'#a46bff',p)}}},
+ {id:'laser',n:'Hellgaze Laser',g:'HL',r:2,trig:'tick',secs:1.2,d:L=>`Fire a laser straight down from this tile, hitting every peg in its path${L>1?` (${L} beams)`:''}`,fn:L=>{const x0=tileBoardX(curItem);for(let k=0;k<L;k++){const x=Math.max(16,Math.min(W-16,x0+(k-(L-1)/2)*28));fxBeam(curItem,x,0,'#ff3b2f');zaps.push({x1:x,y1:0,x2:x,y2:BT,t:0,c:'#ff3b2f'});echoHits(numPegs().filter(q=>Math.abs(q.x-x)<15).sort((a,b)=>a.y-b.y),'#ff3b2f',{x,y:0})}blip(1200,.06,'sawtooth',.02)}},
+ {id:'spout',n:'Soul Spout',g:'So',r:2,trig:'start',d:L=>`Pour ${L} extra soul${L>1?'s':''} out of this tile`,fn:L=>{const x0=tileBoardX(curItem);for(let k=0;k<L;k++){const x=Math.max(20,Math.min(W-20,x0+(k-(L-1)/2)*20));fxBeam(curItem,x,DROP_Y,'#5ce1ff');spawn(x,DROP_Y,(rnd()-.5)*90,40)}}},
+ {id:'brand',n:'Branding Iron',g:'BR',r:1,trig:'hitN',every:5,d:L=>`Zap ${L+1} random pegs from this tile, doubling them`,fn:L=>doublePegs(L+1)},
  {id:'rocket',n:'Hellfire Rocket',g:'Rk',r:2,trig:'wallN',every:4,d:L=>`Blast at the soul (size ${L})`,fn:(L,c)=>{const b=c.ball||anyBall();if(b)explode(b.x,b.y,50+15*L)}},
 ];
 const CURSED=[
@@ -478,7 +484,7 @@ const numPegs=()=>st.pegs.filter(p=>p.kind==='num'&&!p.off);
 const emptyCount=()=>st.pegs.filter(p=>p.kind===null).length;
 const boardTotal=()=>st.pegs.reduce((a,p)=>a+(p.kind==='num'?p.v:0),0);
 const maxPeg=()=>st.pegs.reduce((a,p)=>Math.max(a,p.kind==='num'?p.v:0),0);
-function doublePegs(n){const l=shuffle(numPegs()).slice(0,n);l.forEach(p=>{p.v*=2;p.born=Math.max(p.born,p.v);p.flash=1});noteDoubled(l.length)}
+function doublePegs(n){const l=shuffle(numPegs()).slice(0,n);l.forEach(p=>{p.v*=2;p.born=Math.max(p.born,p.v);p.flash=1;if(curItem>=0)fxBeam(curItem,p.x,p.y,'#ffd54a')});noteDoubled(l.length)}
 function noteDoubled(n){if(!D||!n)return;for(let k=0;k<n;k++){D.dbls=(D.dbls||0)+1;fireEvery('dblN',D.dbls,{})}}
 function growPegs(n){const t=baseVal()*4;shuffle(numPegs()).slice(0,n).forEach(p=>{p.v=Math.max(p.v,t);p.born=Math.max(p.born,p.v);p.flash=1})}
 function convert(kind,n){shuffle(numPegs()).slice(0,n).forEach(p=>{p.kind=kind;p.v=0;p.flash=1});st.specials[kind]=(st.specials[kind]||0)+n}
@@ -508,8 +514,9 @@ function runItem(i,times){
   if(depth>5)return;depth++;
   let n=times||1;if(st.inv[i-1]&&st.inv[i-1].id==='amp')n*=2;if(isV('glass'))n*=2;
   if(D&&D.fx)D.fx[i]=(D.fx[i]||0)+n;
-  for(let k=0;k<n;k++){it.fn(x.L,curCtx);x.fired=(x.fired||0)+1;if(st.inv[i+1]&&st.inv[i+1].id==='mirror'){it.fn(x.L,curCtx);st.inv[i+1].fired=(st.inv[i+1].fired||0)+1;flashT[i+1]=performance.now()}}
-  flashT[i]=performance.now();depth--;
+  const pi=curItem;curItem=i;fxRing(i,RAR[it.r].c);
+  for(let k=0;k<n;k++){curItem=i;it.fn(x.L,curCtx);x.fired=(x.fired||0)+1;if(st.inv[i+1]&&st.inv[i+1].id==='mirror'){curItem=i+1;it.fn(x.L,curCtx);st.inv[i+1].fired=(st.inv[i+1].fired||0)+1;flashT[i+1]=performance.now()}}
+  curItem=pi;flashT[i]=performance.now();depth--;
 }
 let curCtx={};
 function fire(trig,c){
@@ -529,7 +536,27 @@ function fireEvery(trig,count,c){
   st.inv.forEach((x,i)=>{const it=IT[x.id];if(it.trig===trig&&it.every&&count%it.every===0)runItem(i)});
   curCtx=prev;
 }
-let forcing=0;
+let forcing=0,curItem=-1;
+// screen-space effects layer above the page, so beams can leave a relic tile and reach the board
+const fxCv=document.getElementById('fx'),fxx=fxCv.getContext('2d'),fxList=[];let fxDirty=false;
+function tileScreen(i){const b=barEls[i];if(!b)return null;const r=b.getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+r.height*.6}}
+function boardScreen(x,y){const r=cv.getBoundingClientRect();return{x:r.left+x*scale,y:r.top+y*scale}}
+function tileBoardX(i){const t=tileScreen(i);if(!t)return W/2;const r=cv.getBoundingClientRect();return Math.max(20,Math.min(W-20,(t.x-r.left)/scale))}
+function fxBeam(i,x,y,c){if(i<0||fxList.length>120)return;fxList.push({k:'beam',i,x,y,c,t:0})}
+function fxRing(i,c){if(i<0||fxList.length>120)return;fxList.push({k:'ring',i,c,t:0})}
+function drawFx(dt){
+  const dpr=Math.min(2,devicePixelRatio||1),w=innerWidth,h=innerHeight;
+  if(fxCv.width!==Math.round(w*dpr)||fxCv.height!==Math.round(h*dpr)){fxCv.width=Math.round(w*dpr);fxCv.height=Math.round(h*dpr)}
+  if(!fxList.length){if(fxDirty){fxx.clearRect(0,0,fxCv.width,fxCv.height);fxDirty=false}return}
+  fxDirty=true;fxx.setTransform(dpr,0,0,dpr,0,0);fxx.clearRect(0,0,w,h);fxx.lineCap='round';
+  for(let n=fxList.length-1;n>=0;n--){const f=fxList[n];f.t+=dt*(f.k==='ring'?2.6:3.2);if(f.t>=1){fxList.splice(n,1);continue}
+    const a=tileScreen(f.i);if(!a)continue;fxx.globalAlpha=1-f.t;fxx.strokeStyle=f.c;fxx.shadowColor=f.c;fxx.shadowBlur=10;
+    if(f.k==='ring'){fxx.lineWidth=2;fxx.beginPath();fxx.arc(a.x,a.y-6,8+f.t*22,0,Math.PI*2);fxx.stroke();continue}
+    const b=boardScreen(f.x,f.y),segs=7;fxx.lineWidth=3*(1-f.t)+1;fxx.beginPath();fxx.moveTo(a.x,a.y);
+    for(let k=1;k<segs;k++){const u=k/segs,j=(Math.sin(k*12.9+f.x+f.t*30)*9)*(1-Math.abs(u-.5)*1.4);fxx.lineTo(a.x+(b.x-a.x)*u+j,a.y+(b.y-a.y)*u)}
+    fxx.lineTo(b.x,b.y);fxx.stroke();fxx.lineWidth=1;fxx.strokeStyle='#fff';fxx.stroke()}
+  fxx.shadowBlur=0;fxx.globalAlpha=1;
+}
 function forceTrigger(which,times,c){
   if(!st.inv.length)return;const prev=curCtx;curCtx=c||curCtx;forcing++;
   if(which==='all')st.inv.forEach((_,i)=>runItem(i,times));
@@ -630,13 +657,14 @@ function nearPegs(p,n){return numPegs().filter(q=>q!==p).sort((a,c)=>Math.hypot(
 function echoHits(list,col,from){
   if(!D)return;const g=curGen+1;if(g>60)return;const now=performance.now();
   for(const q of list){if(q.kind!=='num'||q.off)continue;if(D.chainLeft<=0)return;D.chainLeft--;
-    chainQ.push({q,from:from?{x:from.x,y:from.y}:null,col,g,at:now+(g>1?55:20)+rnd()*35})}
+    chainQ.push({q,from:from?{x:from.x,y:from.y}:null,tile:!from&&curItem>=0?curItem:-1,col,g,at:now+(g>1?55:20)+rnd()*35})}
 }
 function processChain(){
   if(!D){chainQ.length=0;return}const now=performance.now();let n=0;
   chainQ.sort((a,b)=>a.at-b.at);
   while(chainQ.length&&chainQ[0].at<=now&&n<120){const e=chainQ.shift();n++;const q=e.q;if(q.kind!=='num'||q.off)continue;
-    if(zaps.length<90)zaps.push(e.from?{x1:e.from.x,y1:e.from.y,x2:q.x,y2:q.y,t:0,c:e.col}:{x1:q.x,y1:q.y-60,x2:q.x,y2:q.y,t:0,c:e.col});
+    if(e.tile>=0)fxBeam(e.tile,q.x,q.y,e.col);
+    else if(zaps.length<90)zaps.push(e.from?{x1:e.from.x,y1:e.from.y,x2:q.x,y2:q.y,t:0,c:e.col}:{x1:q.x,y1:q.y-60,x2:q.x,y2:q.y,t:0,c:e.col});
     D.links=(D.links||0)+1;if(e.g>(D.chain||0))D.chain=e.g;
     for(const [lv,txt,c] of CHAIN_MS)if(D.links===lv){popup(W/2,BT-150,txt,c,lv>=100?26:20,.5);flash(c,.15);chord(lv>=100?[659,880,1175]:[523,784])}
     curGen=e.g;hitPeg(q,null,true);
@@ -1095,15 +1123,15 @@ function renderBar(){
   const el=$('itemBar');if(!st||!st.inv){el.innerHTML='';return}
   let h='';
   st.inv.forEach((x,i)=>{const it=IT[x.id],c=RAR[it.r].c;
-    h+=`<button class="it ${sel&&sel.t==='item'&&sel.i===i?'sel':''} ${modIs('freeze')&&i<2?'frozen':''}" type="button" data-i="${i}" title="${esc(it.n)}"><span class="g" style="border-color:${c};color:${c}">${it.g}</span><span class="t"><span>${esc(it.n)}</span><small>${firedLabel(x)}</small></span><span class="x">×${x.L}</span></button>`});
+    h+=`<button class="it ${sel&&sel.t==='item'&&sel.i===i?'sel':''} ${modIs('freeze')&&i<2?'frozen':''}" style="--rc:${c}" type="button" data-i="${i}" title="${esc(it.n)}" aria-label="${esc(it.n)} level ${x.L}"><span class="g">${it.g}</span><span class="pips">${it.r>=4?'':[1,2,3].map(k=>`<i class="${k<=x.L?'on':''}"></i>`).join('')}</span><small class="ct">${fmt(x.fired||0)}</small>${x.burn!=null?`<span class="burn">${x.burn}</span>`:''}<span hidden>×${x.L}</span></button>`});
   for(let i=st.inv.length;i<st.slots;i++)h+='<span class="it empty">+</span>';
-  for(let i=st.slots;i<7;i++)h+='<span class="it locked">Locked</span>';
+  for(let i=st.slots;i<7;i++)h+='<span class="it locked" aria-label="Locked slot">⛌</span>';
   el.innerHTML=h;
   el.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{const i=+b.dataset.i;sel=sel&&sel.t==='item'&&sel.i===i?null:{t:'item',i};renderBar();renderInfo()});
   barEls=[...el.querySelectorAll('[data-i]')];
 }
 let barEls=[],firedShown=[];
-const firedLabel=x=>fmt(x.fired||0)+' fired'+(x.burn!=null?` · ${x.burn} rd${x.burn>1?'s':''} left`:'');
+const firedLabel=x=>fmt(x.fired||0);
 function tickBar(t){
   if(!st||!st.inv)return;
   barEls.forEach((b,i)=>{const on=t-(flashT[i]||0)<160;if(b.classList.contains('fire')!==on)b.classList.toggle('fire',on);
@@ -1405,7 +1433,7 @@ function frame(t){
   blasts.forEach(b=>b.t+=dt*2.5);for(let i=blasts.length-1;i>=0;i--)if(blasts[i].t>=1)blasts.splice(i,1);
   for(let i=parts.length-1;i>=0;i--){const q=parts[i];q.life+=dt;if(q.life>=q.max){parts.splice(i,1);continue}q.vy+=q.grav*dt;q.x+=q.vx*dt;q.y+=q.vy*dt}
   if(D&&st&&st.phase==='falling'){if(D.points!==liveBump.lp){liveBump.p=1;liveBump.lp=D.points}if(D.mult!==liveBump.lm){liveBump.m=1;liveBump.lm=D.mult}}
-  tickTimers(dt);
+  tickTimers(dt);drawFx(dt);
   if(D&&st&&st.phase==='falling'){
     const prod=D.points*D.mult,ratio=(st.roundScore+prod)/st.tgt;
     const MS=[[.5,'HALFWAY THERE','#fbe9dc'],[1,'QUOTA IN REACH','#9cff57'],[2,'DOUBLE QUOTA','#9cff57'],[5,'FIVE TIMES QUOTA','#ffb02e'],[10,'TEN TIMES QUOTA!','#ffb02e'],[50,'UNHOLY NUMBERS','#ff3b2f'],[250,'THE AUDITOR WEEPS','#ff3b2f']];
