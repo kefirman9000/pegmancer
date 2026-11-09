@@ -137,6 +137,7 @@ h3{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute
 .mvbtn{background:transparent;border:1px solid var(--line);color:var(--fg);border-radius:8px;padding:3px 9px;font-size:12px;font-weight:800}
 .usebtn{background:var(--gold);border:0;color:#2a0a00;border-radius:8px;padding:4px 11px;font-size:12px;font-weight:800}
 .ownbar{display:flex;gap:5px;flex-wrap:wrap}
+.ownbar .it{width:46px;height:46px}.ownbar .it.trainable::after{content:'▲';position:absolute;top:1px;right:4px;font-size:9px;color:#9cff57}
 .claw{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:46px 10px 12px;overflow:hidden}
 .claw .rail{position:absolute;top:10px;left:10px;right:10px;height:4px;background:var(--line);border-radius:2px}
 .claw .hand{position:absolute;top:4px;width:34px;margin-left:-17px;height:32px;display:flex;flex-direction:column;align-items:center}
@@ -501,7 +502,9 @@ function bucketMult(i){
   return m;
 }
 function target(){
-  const r=st.round;let t=(25+boardTotal())*(1+.15*(r-1))*Math.pow(1.045,r-1);
+  // quotas climb faster than before, and never drop below 30% of what you scored last round
+  const r=st.round;let t=(25+boardTotal())*(1+.25*(r-1))*Math.pow(1.1,r-1);
+  if(st.lastScore)t=Math.max(t,st.lastScore*.3);
   if(st.mod)t*=st.mod.boss?1.6:1.25;
   if(has('clock'))t*=1.3;
   if(isV('pyro'))t*=1.25;if(isV('probation'))t*=.8;
@@ -795,7 +798,7 @@ function finishDrop(){
 }
 function endRound(){
   if(st.phase==='over')return;
-  st.phase='between';balls=[];
+  st.phase='between';balls=[];st.lastScore=st.roundScore;
   const won=st.roundScore>=st.tgt;
   const lines=[];
   if(won){
@@ -890,20 +893,23 @@ function itemCard(it,price,btn,extra=''){
    <div class="trig">${trigText(it)}</div>
    <div class="ds">${it.d(lvl)}${evolvesInto(it.id)?`<br><span style="color:#ff4fd8;font-size:10.5px">Evolves with ${IT[evolvesInto(it.id).from.find(f=>f!==it.id)].n}</span>`:''}</div>${extra}${btn}`;
 }
-function ownedHTML(){
+function ownedHTML(train){
   if(!st.inv.length)return '';
   const s=sel&&sel.t==='item'&&st.inv[sel.i]?st.inv[sel.i]:null;
-  return `<h3>Your relics · ${st.inv.length}/${st.slots} shelves (tap to sell or move)</h3>
-  <div class="ownbar">${st.inv.map((x,i)=>{const it=IT[x.id];return `<button class="it ${s===x?'sel':''}" type="button" data-own="${i}"><span class="g" style="border-color:${RAR[it.r].c};color:${RAR[it.r].c}">${it.g}</span><span class="x">×${x.L}</span></button>`}).join('')}</div>
+  return `<h3>Your relics · ${st.inv.length}/${st.slots} shelves (tap to ${train?'train, ':''}sell or move)</h3>
+  <div class="ownbar">${st.inv.map((x,i)=>{const it=IT[x.id];return `<button class="it ${s===x?'sel':''}${train&&canTrain(x)&&st.coins>=trainCost(x)?' trainable':''}" style="--rc:${RAR[it.r].c}" type="button" data-own="${i}"><span class="g">${it.g}</span><span class="pips">${it.r>=4?'':[1,2,3].map(k=>`<i class="${k<=x.L?'on':''}"></i>`).join('')}</span></button>`}).join('')}</div>
   ${s?`<div id="ovInfo" class="next" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;align-items:center"><span><b>${IT[s.id].n}</b> ${trigText(IT[s.id])}: ${IT[s.id].d(s.L)}</span>
-   <button class="mvbtn" id="mvL" type="button">◀ Move</button><button class="mvbtn" id="mvR" type="button">Move ▶</button><button class="sellbtn" id="sellO" type="button">Sell ${sellValue(s)}c</button></div>`:''}`;
+   <button class="mvbtn" id="mvL" type="button">◀ Move</button><button class="mvbtn" id="mvR" type="button">Move ▶</button>${train&&canTrain(s)?`<button class="buy" id="trainO" type="button" style="padding:6px 10px" ${st.coins>=trainCost(s)?'':'disabled'}>Train to ×${s.L+1} · ${trainCost(s)}c</button>`:''}<button class="sellbtn" id="sellO" type="button">Sell ${sellValue(s)}c</button></div>`:''}`;
 }
 function wireOwned(rerender){
   ovCard.querySelectorAll('[data-own]').forEach(b=>b.onclick=()=>{const i=+b.dataset.own;sel=sel&&sel.t==='item'&&sel.i===i?null:{t:'item',i};rerender()});
   const s=$('sellO');if(s)s.onclick=()=>{sellItem(sel.i);sel=null;rerender()};
+  const tr=$('trainO');if(tr)tr.onclick=()=>{const x=st.inv[sel.i];if(!x||!canTrain(x))return;const c=trainCost(x);if(st.coins<c)return;st.coins-=c;x.L++;x.paid+=c;logEv(`trained ${IT[x.id].n} to ×${x.L} for ${c}`);chord([523,659,784]);renderBar();rerender()};
   const l=$('mvL');if(l)l.onclick=()=>{moveItem(sel.i,-1);rerender()};
   const r=$('mvR');if(r)r.onclick=()=>{moveItem(sel.i,1);rerender()};
 }
+const trainCost=x=>Math.round((12*x.L+6)*priceMul());
+const canTrain=x=>IT[x.id].r<4&&x.L<3;
 const sellValue=x=>IT[x.id].r===4?1:Math.max(1,Math.floor(x.paid/2));
 function sellItem(i){const x=st.inv[i];if(!x)return;st.coins+=sellValue(x);logEv(`sold ${IT[x.id].n} ×${x.L} for ${sellValue(x)}`);st.inv.splice(i,1);renderBar();renderTray()}
 function moveItem(i,d){const j=i+d;if(j<0||j>=st.inv.length)return;[st.inv[i],st.inv[j]]=[st.inv[j],st.inv[i]];sel={t:'item',i:j};renderBar()}
@@ -933,7 +939,7 @@ function renderMarket(){
    <div class="offer"><div class="ic" style="border-color:var(--fg);color:var(--fg)">+</div><div class="nm">Extra relic shelf</div><div class="ds">${st.slots>=7?'You have the maximum of 7 slots.':`Go from ${st.slots} to ${st.slots+1} slots.`}</div><button class="buy" id="buySlot" type="button" ${st.slots<7&&!O.slotBought&&st.coins>=slotCost()?'':'disabled'}>${st.slots>=7?'Maxed':O.slotBought?'Bought':slotCost()+' coins'}</button></div></div>
    <div class="shoprow"><button class="chipbtn" id="rerollBtn" type="button" ${st.coins>=rerollCost()?'':'disabled'}>Reroll · ${rerollCost()?rerollCost()+' coins':'free'}</button><div class="spacer"></div><span style="color:var(--gold);font-weight:800">${st.coins} coins</span></div>
    ${st.keys?`<button class="door" id="doorBtn" type="button">Use a Ledger Key (${st.keys}) to open the Black Ledger</button>`:''}
-   ${ownedHTML()}
+   ${ownedHTML(true)}
    ${nextHTML()}
    <button class="big" id="contBtn" type="button">Start round ${st.round+1}</button>
    <button class="chipbtn" id="ovExp" type="button">Export run summary</button>`);
@@ -999,7 +1005,7 @@ function showClaw(head,lines){
     else{const p=prizes[idx];boxes[idx].classList.add('got');boxes[idx].textContent=label(p);
       if(p.k==='coins'){st.coins+=p.v;msg=`+${p.v} coins`}
       else if(p.k==='food'){if(st.foods.length<st.foodSlots){st.foods.push(p.v);msg='Got '+FOODS.find(f=>f.id===p.v).n}else msg='Food tray full, so you left it.'}
-      else if(p.k==='item'){msg=gainItem(p.v,0)?'Got '+IT[p.v].n:'No free slot for '+IT[p.v].n}
+      else if(p.k==='item'){if(gainItem(p.v,0))msg='Got '+IT[p.v].n;else{const c=Math.max(3,Math.round((RAR[IT[p.v].r].p||5)*priceMul()/2));st.coins+=c;msg='No room for '+IT[p.v].n+', pawned it for '+c+' coins'}}
       else if(p.k==='key'){st.keys++;msg='Got a Ledger Key. Use it at the next Commissary.'}
       else{const pk=shuffle(PERKS.filter(x=>!st.perks.includes(x.id)))[0];if(pk){st.perks.push(pk.id);if(pk.gain)pk.gain();msg='Perk: '+pk.n+'. '+pk.d}else{st.coins+=8;msg='+8 coins'}}
       got.push(msg);chord([660,880,990]);renderBar();renderTray();
@@ -1127,7 +1133,7 @@ function renderBar(){
   const el=$('itemBar');if(!st||!st.inv){el.innerHTML='';return}
   let h='';
   st.inv.forEach((x,i)=>{const it=IT[x.id],c=RAR[it.r].c;
-    h+=`<button class="it ${sel&&sel.t==='item'&&sel.i===i?'sel':''} ${modIs('freeze')&&i<2?'frozen':''}" style="--rc:${c}" type="button" data-i="${i}" title="${esc(it.n)}" aria-label="${esc(it.n)} level ${x.L}"><span class="g">${it.g}</span><span class="pips">${it.r>=4?'':[1,2,3].map(k=>`<i class="${k<=x.L?'on':''}"></i>`).join('')}</span><small class="ct">${fmt(x.fired||0)}</small>${x.burn!=null?`<span class="burn">${x.burn}</span>`:''}<span hidden>×${x.L}</span></button>`});
+    h+=`<button class="it ${sel&&sel.t==='item'&&sel.i===i?'sel':''} ${modIs('freeze')&&i<2?'frozen':''}" style="--rc:${c}" type="button" data-i="${i}" title="${esc(it.n)}" aria-label="${esc(it.n)} level ${x.L}"><span class="g">${it.g}</span><span class="pips">${it.r>=4?'':[1,2,3].map(k=>`<i class="${k<=x.L?'on':''}"></i>`).join('')}</span><small class="ct">${firedLabel(x)}</small>${x.burn!=null?`<span class="burn">${x.burn}</span>`:''}<span hidden>×${x.L}</span></button>`});
   for(let i=st.inv.length;i<st.slots;i++)h+='<span class="it empty">+</span>';
   for(let i=st.slots;i<7;i++)h+='<span class="it locked" aria-label="Locked slot">⛌</span>';
   el.innerHTML=h;
@@ -1135,7 +1141,7 @@ function renderBar(){
   barEls=[...el.querySelectorAll('[data-i]')];
 }
 let barEls=[],firedShown=[];
-const firedLabel=x=>fmt(x.fired||0);
+const firedLabel=x=>IT[x.id].trig==='passive'?'':fmt(x.fired||0);
 function tickBar(t){
   if(!st||!st.inv)return;
   barEls.forEach((b,i)=>{const on=t-(flashT[i]||0)<160;if(b.classList.contains('fire')!==on)b.classList.toggle('fire',on);
