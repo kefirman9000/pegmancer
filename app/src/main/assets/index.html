@@ -347,7 +347,7 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',
 let st=null,D=null,balls=[],pops=[],aimX=W/2,aimAng=0,dragging=false,sel=null,shake=0,depth=0,chargeStart=0,anchor=null;
 let pull=0,pullY=0,maxSince=0,kbPull=false,recoil=0;
 const TOUCH=matchMedia('(hover: none), (pointer: coarse)').matches;
-const AIM_HINT=TOUCH?'Drag to aim, then Launch':'Aim with the mouse, click to fire';
+const AIM_HINT=TOUCH?'Swipe to aim, tap to launch':'Aim with the mouse, click to fire';
 const chargeNow=()=>dragging&&!st.hellUsed&&chargeStart?Math.min(1,Math.max(0,(performance.now()-chargeStart-250)/1000)):0;
 const muzzle=a=>({x:CX+Math.sin(a)*BARREL,y:CY+Math.cos(a)*BARREL});
 const exitX=()=>PW-ballR()-1;
@@ -799,7 +799,7 @@ function showTitle(){
   <button class="chipbtn" id="dailyBtn" type="button">Daily run · ${todaySeed()}${meta.daily[todaySeed()]?' · best round '+meta.daily[todaySeed()]:''}</button></div>
   ${best.round?`<div class="next">Best: <b>round ${best.round}</b> · best drop <b>${fmtInt(best.drop)}</b></div>`:''}
   <div class="shoprow">${load('pegmancer.lastRun','')?'<button class="chipbtn" id="lastBtn" type="button">Export last run</button>':''}<div class="spacer"></div>${APPB?'<button class="chipbtn" id="updBtn" type="button">Check for updates</button>':''}<span class="next">${VERSION==='web'?'Web version':'v'+VERSION}</span></div>
-  <div class="how"><p><b>Launch:</b> ${TOUCH?'swipe sideways on the board to swing the soul cannon (faster swipes turn it further), then tap <b>Launch</b>':'move the mouse to aim the soul cannon, then click to fire'}. The dotted line shows the path to the first peg. <b>Hold</b> ${TOUCH?'Launch':'the mouse button'} until the cannon glows to fire a Hellfire soul that burns the first 5 pegs it hits (once per round).</p>
+  <div class="how"><p><b>Launch:</b> ${TOUCH?'swipe sideways on the board to swing the soul cannon (faster swipes turn it further), then tap the board or <b>Launch</b> to fire':'move the mouse to aim the soul cannon, then click to fire'}. The dotted line shows the path to the first peg. <b>Hold</b> ${TOUCH?'your finger still':'the mouse button'} until the cannon glows to fire a Hellfire soul that burns the first 5 pegs it hits (once per round).</p>
   <p>Each launch scores <b>suffering × mult × bucket</b>. A torment peg gives its value, then halves. At 0 it pops.</p>
   <p>Every time your round total passes quota again, a <b>fresh consignment of the damned</b> arrives: empty slots refill, matching neighbours fuse into greater sinners, and you get a soul coin.</p>
   <p>Relics in the bar above the board fire on their trigger, left to right. Order matters. Miss quota and you lose a chance. Survive ${FINAL} rounds and the Infernal Auditor to make Pegmancer.</p>
@@ -1173,7 +1173,7 @@ const canAim=()=>st&&st.log&&st.phase==='aim'&&ov.hidden;
 cv.addEventListener('pointerdown',e=>{
   initAudio();if(sel){sel=null;renderBar();renderInfo()}if(!canAim())return;
   if(e.pointerType==='mouse'){aimAt(boardPt(e));if(e.button!==0)return;dragging=true;chargeStart=performance.now()}
-  else{aiming=true;lastTouch={x:e.clientX,t:performance.now()}}
+  else{aiming=true;lastTouch={x:e.clientX,t:performance.now()};touchStart={x:e.clientX,y:e.clientY,moved:false};dragging=true;chargeStart=performance.now()}
   try{cv.setPointerCapture(e.pointerId)}catch(_){}
 });
 // touch aiming is relative: swipe sideways to swing the cannon. A slow drag of about
@@ -1184,9 +1184,16 @@ function touchAim(e){
   const speed=Math.abs(dx)/dt,accel=1+Math.min(2,Math.max(0,speed-.15)*2.2);
   aimAng=Math.max(-MAX_AIM,Math.min(MAX_AIM,aimAng+dx*(2*MAX_AIM/150)*(AIM_SENS[meta.aimSens]||1)*accel));
 }
-cv.addEventListener('pointermove',e=>{if(!canAim())return;if(e.pointerType==='mouse')aimAt(boardPt(e));else if(aiming&&lastTouch)touchAim(e)});
-cv.addEventListener('pointerup',e=>{aiming=false;if(e.pointerType==='mouse'&&dragging&&canAim()){const ch=chargeNow();dragging=false;tryDrop(1,ch)}dragging=false});
-cv.addEventListener('pointercancel',()=>{aiming=false;dragging=false});
+let touchStart=null;
+cv.addEventListener('pointermove',e=>{if(!canAim())return;if(e.pointerType==='mouse'){aimAt(boardPt(e));return}
+  if(!aiming||!lastTouch)return;
+  // once the finger slides more than a few pixels it's an aim, not a tap: stop charging
+  if(touchStart&&!touchStart.moved&&Math.hypot(e.clientX-touchStart.x,e.clientY-touchStart.y)>9){touchStart.moved=true;dragging=false;lastTouch={x:e.clientX,t:performance.now()};return}
+  if(touchStart&&touchStart.moved)touchAim(e)});
+cv.addEventListener('pointerup',e=>{aiming=false;
+  const tap=e.pointerType!=='mouse'&&touchStart&&!touchStart.moved;touchStart=null;
+  if((e.pointerType==='mouse'||tap)&&dragging&&canAim()){const ch=chargeNow();dragging=false;tryDrop(1,ch)}dragging=false});
+cv.addEventListener('pointercancel',()=>{aiming=false;dragging=false;touchStart=null});
 const fireBtn=$('fireBtn');
 fireBtn.addEventListener('pointerdown',e=>{e.preventDefault();initAudio();if(!canAim())return;dragging=true;chargeStart=performance.now();try{fireBtn.setPointerCapture(e.pointerId)}catch(_){}});
 fireBtn.addEventListener('pointerup',()=>{if(dragging&&canAim()){const ch=chargeNow();dragging=false;tryDrop(1,ch)}dragging=false;fireBtn.classList.remove('hot')});
@@ -1234,7 +1241,7 @@ function draw(t){
     {const prod=D.points*D.mult,ratio=(st.roundScore+prod)/st.tgt,sz=Math.min(34,20+Math.log10(prod+1)*3.5)*(1+.25*Math.max(liveBump.p,liveBump.m));
      ctx.textAlign='center';ctx.font=Math.round(sz)+'px "Lilita One", sans-serif';ctx.fillStyle=ratio>=1?'#9cff57':ratio>=.5?'#ffb02e':'#fbe9dc';ctx.shadowColor=ctx.fillStyle;ctx.shadowBlur=ratio>=1?14:0;
      ctx.fillText('= '+fmt(prod),CX,DROP_Y+46);ctx.shadowBlur=0}
-  }else{ctx.font='800 9px Nunito, sans-serif';ctx.textAlign='left';if(st&&st.log){ctx.fillStyle='#9cff57';ctx.fillText((ZONES[zoneOf(st.round)]+(remodelIdx(st.round)?' · '+REMODELS[remodelIdx(st.round)]:'')).toUpperCase(),8,DROP_Y-22)}else{ctx.fillStyle='#c59a87';ctx.fillText(TOUCH?'DRAG TO AIM · TAP LAUNCH':'AIM WITH MOUSE · CLICK TO FIRE',8,DROP_Y-22)}if(st&&st.log&&st.phase==='aim'){ctx.textAlign='right';ctx.fillStyle=st.hellUsed?'#5a2318':'#ff6a00';ctx.fillText(st.hellUsed?'HELLFIRE USED':'HOLD TO CHARGE: HELLFIRE',W-8,DROP_Y-22)}}
+  }else{ctx.font='800 9px Nunito, sans-serif';ctx.textAlign='left';if(st&&st.log){ctx.fillStyle='#9cff57';ctx.fillText((ZONES[zoneOf(st.round)]+(remodelIdx(st.round)?' · '+REMODELS[remodelIdx(st.round)]:'')).toUpperCase(),8,DROP_Y-22)}else{ctx.fillStyle='#c59a87';ctx.fillText(TOUCH?'SWIPE TO AIM · TAP TO LAUNCH':'AIM WITH MOUSE · CLICK TO FIRE',8,DROP_Y-22)}if(st&&st.log&&st.phase==='aim'){ctx.textAlign='right';ctx.fillStyle=st.hellUsed?'#5a2318':'#ff6a00';ctx.fillText(st.hellUsed?'HELLFIRE USED':'HOLD TO CHARGE: HELLFIRE',W-8,DROP_Y-22)}}
   if(st&&st.log){
     const hotC=chargeNow(),hot=hotC>=1;
     if(st.phase==='aim'){
