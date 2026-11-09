@@ -46,3 +46,4 @@ If you find this useful, you can support my work through [GitHub Sponsors](https
 - **Summons**: Brimstone Meteor, Imp Swarm and Judgment Hammer drop things onto the board.
 - Meeting quota restores a chance; the Hiring Freeze audit disables your two leftmost relics.
 - **Chain reactions**: hits and pops made by relics can trigger more relics, link after link (Lit Fuse, Domino Damnation, Powder Keg, Oath of Cascade, and the Chain of Ruin evolution are built for it).
+- **More relics**: Rebound Imp, Infernal Furnace, Shrieking Harpy, Frost Tithe, Perfect Sin, Undying Grub, Collector's Claw, Hollow Reliquary, Doomsday Skull, Toadstool of Madness, Bloated Idol, Puppet of Penance, Relay Totem, Star-Spawn; cursed Serpent's Gamble; snacks Blood Berry and Hellhound Dog.

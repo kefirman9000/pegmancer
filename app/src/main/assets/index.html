@@ -175,8 +175,8 @@ const SPECIAL={mult:'#9cff57',gold:'#ffd54a',bumper:'#b26bff',splitter:'#5ce1ff'
 const SPECIAL_GLYPH={mult:'×',gold:'$',bumper:'',splitter:'Y',crit:'!',bomb:'*',shackle:'≡',glutton:'²',warp:'@'};
 const PEGINFO=[['num','Torment pegs: give their value in suffering, then halve. Pop at 0'],['mult','Wrath sigil: +1 mult'],['gold','Coin sigil: +1 soul coin'],['bumper','Rubber sigil: big bounce'],['splitter','Split sigil: splits the soul'],['crit','Agony sigil: doubles mult'],['bomb','Sulfur sigil: blast, once a round'],['shackle','Chain sigil: hits the 3 nearest pegs'],['glutton','Gluttony sigil: doubles the 2 nearest pegs, once a launch'],['warp','Warp sigil: teleports the soul to the top']];
 const RAR={1:{n:'Common',c:'#d9a38f',p:5},2:{n:'Uncommon',c:'#9cff57',p:8},3:{n:'Rare',c:'#ffb02e',p:12},4:{n:'Cursed',c:'#c86bff',p:0},6:{n:'Evolved',c:'#ff4fd8',p:0},5:{n:'Temporary',c:'#5ce1ff',p:6}};
-const TRIG={start:'When a drop starts',hit:'Every peg hit',pop:'Every peg popped',firstPop:'First pop of each drop',wall:'When the soul hits a wall',land:'When a soul lands',end:'When a drop ends',quota:'When you meet quota',restock:'Every restock',round:'When a round starts',bump:'Every rubber sigil hit',bigPop:'Popping a peg born at 8+',passive:'Always on',tick:'On a timer'};
-const trigText=it=>it.secs?`Every ${it.secs}s while a soul falls`:it.every?`Every ${it.every} ${it.trig==='popN'?'pops':it.trig==='hitN'?'hits':'wall hits'}`:TRIG[it.trig];
+const TRIG={start:'When a drop starts',hit:'Every peg hit',pop:'Every peg popped',firstPop:'First pop of each drop',wall:'When the soul hits a wall',land:'When a soul lands',end:'When a drop ends',quota:'When you meet quota',restock:'Every restock',round:'When a round starts',bump:'Every rubber sigil hit',bigPop:'Popping a peg born at 8+',passive:'Always on',tick:'On a timer',forced:'When force-triggered'};
+const trigText=it=>it.secs?`Every ${it.secs}s while a soul falls`:it.every?`Every ${it.every} ${it.trig==='popN'?'pops':it.trig==='hitN'?'hits':it.trig==='dblN'?'pegs doubled':'wall hits'}`:TRIG[it.trig];
 const ITEMS=[
  {id:'sling',n:'Pitchfork Jab',g:'SS',r:1,trig:'start',d:L=>`+${4*L} points`,fn:L=>addPts(4*L)},
  {id:'lantern',n:'Brimstone Lantern',g:'Ln',r:1,trig:'start',d:L=>`+${L} mult`,fn:L=>addMult(L)},
@@ -238,6 +238,20 @@ const ITEMS=[
  {id:'fuse',n:'Lit Fuse',g:'LF',r:1,trig:'pop',d:L=>`${15*L}% chance a popped peg bursts, hitting everything next to it`,fn:(L,c)=>{if(c.peg&&rnd()<.15*L){const p=c.peg;blasts.push({x:p.x,y:p.y,r:45,t:0,c:'#ff6a00'});echoHits(numPegs().filter(q=>Math.hypot(q.x-p.x,q.y-p.y)<52),'#ff6a00',p)}}},
  {id:'domino',n:'Domino Damnation',g:'Dd',r:2,trig:'pop',d:L=>`A popped peg knocks into ${L>1?'the 2 pegs':'the peg'} beside it in its row${L>2?', twice':''}`,fn:(L,c)=>{if(!c.peg)return;const p=c.peg,row=numPegs().filter(q=>Math.abs(q.y-p.y)<8);const l=row.filter(q=>q.x<p.x).sort((a,b)=>b.x-a.x)[0],r=row.filter(q=>q.x>p.x).sort((a,b)=>a.x-b.x)[0];const t=(L>1?[l,r]:[rnd()<.5?l||r:r||l]).filter(Boolean);for(let k=0;k<(L>2?2:1);k++)echoHits(t,'#ffe9c9',p)}},
  {id:'keg',n:'Powder Keg',g:'PK',r:2,trig:'popN',every:8,d:L=>`Blow up the popped peg, hitting everything within ${50+10*L}px`,fn:(L,c)=>{if(!c.peg)return;const p=c.peg,rad=50+10*L;blasts.push({x:p.x,y:p.y,r:rad,t:0,c:'#ff6a00'});shake=Math.max(shake,5);echoHits(numPegs().filter(q=>Math.hypot(q.x-p.x,q.y-p.y)<rad),'#ff6a00',p)}},
+ {id:'reboundImp',n:'Rebound Imp',g:'RI',r:1,trig:'wall',d:L=>`Smack ${L} random peg${L>1?'s':''}`,fn:L=>echoHits(shuffle(numPegs()).slice(0,L),'#ffd54a')},
+ {id:'furnace',n:'Infernal Furnace',g:'IF',r:2,trig:'tick',secs:1,d:L=>`A random peg erupts, hitting up to ${6+2*L} pegs around it`,fn:L=>{const p=pick(numPegs());if(!p)return;blasts.push({x:p.x,y:p.y,r:48,t:0,c:'#ff6a00'});echoHits([p].concat(nearPegs(p,5+2*L).filter(q=>Math.hypot(q.x-p.x,q.y-p.y)<70)),'#ff6a00',p)}},
+ {id:'harpy',n:'Shrieking Harpy',g:'SH',r:3,trig:'tick',secs:1.5,d:L=>`Drop an egg that hits every peg in ${L>1?L+' random rows':'a random row'}`,fn:L=>{const ys=[...new Set(numPegs().map(p=>Math.round(p.y/10)))];shuffle(ys).slice(0,L).forEach(y=>{const row=numPegs().filter(p=>Math.round(p.y/10)===y);if(row.length){zaps.push({x1:8,y1:row[0].y,x2:W-8,y2:row[0].y,t:0,c:'#fff3c4'});echoHits(row,'#fff3c4')}})}},
+ {id:'frost',n:'Frost Tithe',g:'FT',r:3,trig:'firstPop',d:L=>`Every peg pays ${15*L}% of its value, without being hit`,fn:L=>{const v=Math.floor(boardTotal()*.15*L);if(v){addPts(v);popup(W/2,BT-120,'FROST TITHE +'+fmt(v),'#5ce1ff',18,.5)}}},
+ {id:'perfect',n:'Perfect Sin',g:'Pf',r:2,trig:'firstPop',d:L=>`If the first peg popped was your biggest, mult ×${fmt(2+.5*L)}`,fn:(L,c)=>{if(c.peg&&c.peg.born>=maxPeg()){D.mult*=2+.5*L;popup(c.peg.x,c.peg.y-20,'PERFECT ×'+fmt(2+.5*L),'#ff4fd8',20,.5);flash('#ff4fd8',.2)}}},
+ {id:'grub',n:'Undying Grub',g:'UG',r:1,trig:'hit',d:L=>`${10*L}% chance to double a random peg`,fn:L=>{if(rnd()<.1*L)doublePegs(1)}},
+ {id:'claw',n:'Collector\'s Claw',g:'CC',r:2,trig:'tick',secs:3,d:L=>`Each relic you hold scores a random peg's value${L>1?' ×'+L:''}`,fn:L=>{const p=pick(numPegs());if(p){const v=p.v*st.inv.length*L;addPts(v);popup(p.x,p.y-18,'CLAW +'+fmt(v),'#ffd54a',15)}}},
+ {id:'reliquary',n:'Hollow Reliquary',g:'HR',r:2,trig:'end',d:L=>`Each empty peg slot scores ${L>1?L+'× ':''}the pegs popped this launch`,fn:L=>{const v=emptyCount()*D.pops*L;if(v){addPts(v);popup(W/2,BT-60,'RELIQUARY +'+fmt(v),'#c9c9d6',18,.5)}}},
+ {id:'skull',n:'Doomsday Skull',g:'DS',r:3,trig:'end',d:L=>`${10*L}% chance (${Math.min(100,40*L)}% on your last launch) to pop every peg at full value`,fn:L=>{const ch=st.dropsLeft<=1?.4*L:.1*L;if(rnd()<ch){const all=numPegs();popup(W/2,H/2-120,'DOOMSDAY','#ff3b2f',34,.4);flash('#ff3b2f',.45);shake=18;chord([110,147,196]);all.forEach(q=>{addPts(q.v);popPeg(q,null)})}}},
+ {id:'toadstool',n:'Toadstool of Madness',g:'TM',r:3,trig:'wallN',every:2,d:L=>`Mult ×${fmt(1+.1*L)} (it compounds)`,fn:L=>{D.mult*=1+.1*L}},
+ {id:'idol',n:'Bloated Idol',g:'BI',r:2,trig:'quota',d:L=>`${25*L}% chance to double your biggest peg`,fn:L=>{if(rnd()<.25*L){const p=numPegs().sort((a,b)=>b.v-a.v)[0];if(p){p.v*=2;p.born=Math.max(p.born,p.v);p.flash=1;popup(p.x,p.y-16,'BLOATED ×2','#ffb02e',16);noteDoubled(1)}}}},
+ {id:'puppet',n:'Puppet of Penance',g:'PP',r:1,trig:'hit',d:L=>`Points equal to ${L>1?L+'× ':''}the hits this launch so far ÷ 5`,fn:L=>addPts(Math.floor(D.hits/5)*L)},
+ {id:'relay',n:'Relay Totem',g:'RT',r:2,trig:'forced',d:L=>`Passes the trigger to both neighbours. Each success lowers the odds by ${Math.round(20/L)}% until next round`,fn:()=>{}},
+ {id:'starspawn',n:'Star-Spawn',g:'✶',r:2,trig:'dblN',every:3,d:L=>`A random peg bursts, hitting ${3+L} pegs around it`,fn:L=>{const p=pick(numPegs());if(p){blasts.push({x:p.x,y:p.y,r:40,t:0,c:'#a46bff'});echoHits([p].concat(nearPegs(p,2+L)),'#a46bff',p)}}},
  {id:'rocket',n:'Hellfire Rocket',g:'Rk',r:2,trig:'wallN',every:4,d:L=>`Blast at the soul (size ${L})`,fn:(L,c)=>{const b=c.ball||anyBall();if(b)explode(b.x,b.y,50+15*L)}},
 ];
 const CURSED=[
@@ -248,6 +262,7 @@ const CURSED=[
  {id:'curse',n:'Midas Curse',g:'MC',r:4,trig:'restock',d:()=>`+3 coins per restock. Prices are 50% higher.`,fn:()=>addCoins(3)},
  {id:'mouth',n:'Hungry Maw',g:'HM',r:4,trig:'start',d:()=>`+1 mult per 2 empty slots`,fn:()=>addMult(Math.floor(emptyCount()/2))},
  {id:'clock',n:'Shattered Clock',g:'SC',r:4,trig:'passive',d:()=>'+2 drops every round. Targets are 30% higher.'},
+ {id:'serpent',n:'Serpent\'s Gamble',g:'Sn',r:4,trig:'firstPop',d:()=>'50%: double every peg. Otherwise halve them all.',fn:()=>{const all=numPegs();if(rnd()<.5){all.forEach(p=>{p.v*=2;p.born=Math.max(p.born,p.v);p.flash=1});popup(W/2,BT-140,'THE SERPENT SMILES','#9cff57',20,.5);noteDoubled(all.length)}else{all.forEach(p=>{p.v=Math.floor(p.v/2);p.flash=1;if(p.v<=0){p.kind=null;p.v=0}});popup(W/2,BT-140,'THE SERPENT BITES','#ff3b2f',20,.5)}}},
  {id:'abyss',n:'Abyss Lens',g:'AL',r:4,trig:'start',d:()=>'Double every number peg as a drop starts. Halve them all when it ends.',fn:()=>st.pegs.forEach(p=>{if(p.kind==='num')p.v*=2})},
 ];
 const EVOLVED=[
@@ -297,6 +312,8 @@ const FOODS=[
  {id:'wager',n:'Devil\'s Wager',p:0,d:'50%: double your coins. Otherwise lose them all.',use:()=>{if(!st.coins)return false;if(rnd()<.5){st.coins*=2;logEv('wager won')}else{st.coins=0;logEv('wager lost')}}},
  {id:'stew',n:'Chaos Stew',p:6,d:'Turn every relic into a random different one. Levels are kept.',use:()=>{const c=st.inv.filter(x=>IT[x.id].r<4);if(!c.length)return false;c.forEach(x=>{const it=randomItem(ITEMS.filter(i=>i.r!==5&&!st.inv.some(y=>y.id===i.id)));if(it){x.id=it.id;x.burn=it.burn;x.fired=0}})}},
  {id:'tart',n:'Sacrificial Offering',p:5,d:'Level up your rightmost relic. Your leftmost is destroyed.',use:()=>{if(st.inv.length<2)return false;const r=st.inv[st.inv.length-1];if(IT[r.id].r<4&&r.L<3)r.L++;st.inv.shift()}},
+ {id:'berry',n:'Blood Berry',p:4,d:'+1 coin for every Blood Berry eaten this run (max 7).',use:()=>{st.berries=(st.berries||0)+1;st.coins+=Math.min(7,st.berries)}},
+ {id:'hellDog',n:'Hellhound Dog',p:3,d:'+2 coins per chance you have left.',use:()=>{st.coins+=2*st.lives}},
  {id:'popsicle',n:'Lava Pop',p:3,d:'Pop every 1-peg, scoring each.',use:()=>{popRandom(999,p=>p.v===1,true)}},
 ];
 const ELITES=[
@@ -461,7 +478,8 @@ const numPegs=()=>st.pegs.filter(p=>p.kind==='num'&&!p.off);
 const emptyCount=()=>st.pegs.filter(p=>p.kind===null).length;
 const boardTotal=()=>st.pegs.reduce((a,p)=>a+(p.kind==='num'?p.v:0),0);
 const maxPeg=()=>st.pegs.reduce((a,p)=>Math.max(a,p.kind==='num'?p.v:0),0);
-function doublePegs(n){shuffle(numPegs()).slice(0,n).forEach(p=>{p.v*=2;p.born=Math.max(p.born,p.v);p.flash=1})}
+function doublePegs(n){const l=shuffle(numPegs()).slice(0,n);l.forEach(p=>{p.v*=2;p.born=Math.max(p.born,p.v);p.flash=1});noteDoubled(l.length)}
+function noteDoubled(n){if(!D||!n)return;for(let k=0;k<n;k++){D.dbls=(D.dbls||0)+1;fireEvery('dblN',D.dbls,{})}}
 function growPegs(n){const t=baseVal()*4;shuffle(numPegs()).slice(0,n).forEach(p=>{p.v=Math.max(p.v,t);p.born=Math.max(p.born,p.v);p.flash=1})}
 function convert(kind,n){shuffle(numPegs()).slice(0,n).forEach(p=>{p.kind=kind;p.v=0;p.flash=1});st.specials[kind]=(st.specials[kind]||0)+n}
 function bucketMult(i){
@@ -484,6 +502,9 @@ function target(){
 const flashT=[];
 function runItem(i,times){
   const x=st.inv[i];if(!x)return;const it=IT[x.id];if(!it.fn)return;if(modIs('freeze')&&i<2)return;
+  if(x.id==='relay'){if(!forcing||depth>5)return;depth++;x.fired=(x.fired||0)+1;flashT[i]=performance.now();
+    for(const j of [i-1,i+1])if(st.inv[j]&&st.inv[j].id!=='relay'&&rnd()<(st.relayCh??1)){runItem(j);st.relayCh=Math.max(0,(st.relayCh??1)-.2/x.L)}
+    depth--;return}
   if(depth>5)return;depth++;
   let n=times||1;if(st.inv[i-1]&&st.inv[i-1].id==='amp')n*=2;if(isV('glass'))n*=2;
   if(D&&D.fx)D.fx[i]=(D.fx[i]||0)+n;
@@ -508,11 +529,12 @@ function fireEvery(trig,count,c){
   st.inv.forEach((x,i)=>{const it=IT[x.id];if(it.trig===trig&&it.every&&count%it.every===0)runItem(i)});
   curCtx=prev;
 }
+let forcing=0;
 function forceTrigger(which,times,c){
-  if(!st.inv.length)return;const prev=curCtx;curCtx=c||curCtx;
+  if(!st.inv.length)return;const prev=curCtx;curCtx=c||curCtx;forcing++;
   if(which==='all')st.inv.forEach((_,i)=>runItem(i,times));
   else{const i=which==='first'?0:which==='last'?st.inv.length-1:which;if(st.inv[i])runItem(i,times)}
-  curCtx=prev;
+  forcing--;curCtx=prev;
 }
 function addPts(n){if(D)D.points+=n}
 function addMult(n){if(D)D.mult+=n}
@@ -571,7 +593,7 @@ function startRound(){
   if(modIs('foreman'))st.pegs.forEach(p=>{if(p.kind!=='num'&&p.kind!==null)p.off=true});
   st.dropsMax=Math.max(1,5+(has('hopper')?1:0)+(has('clock')?2:0)-(modIs('short')?1:0)-(isV('hoarder')?1:0));
   st.scramblesLeft=1+(hasPerk('disorder')?1:0);
-  st.dropsLeft=st.dropsMax;st.dropNo=0;st.roundScore=0;st.quipLevel=0;st.restocksRound=0;st.quotaHit=false;st.roundBonus=0;
+  st.relayCh=1;st.dropsLeft=st.dropsMax;st.dropNo=0;st.roundScore=0;st.quipLevel=0;st.restocksRound=0;st.quotaHit=false;st.roundBonus=0;
   checkEvolve();
   D={points:0,mult:1};fire('round',{});D=null;
   st.tgt=target();st.phase='aim';balls=[];st.launchAnim=null;pull=0;dragging=false;st.hellUsed=false;
@@ -635,7 +657,7 @@ function hitPeg(p,b,blast){
     case 'splitter':if(!p.used&&b){p.used=true;spawn(b.x,b.y,(rnd()<.5?-1:1)*(140+rnd()*60),-60);popup(p.x,p.y-12,'Split!',SPECIAL.splitter,13);blip(660)}break;
     case 'crit':if(!p.used){p.used=true;D.mult*=2;popup(p.x,p.y-12,'×2 MULT',SPECIAL.crit,20);shake=6;flash(SPECIAL.crit,.22);burst(p.x,p.y,SPECIAL.crit,24,220);blip(990)}break;
     case 'shackle':addPts(1);echoHits(nearPegs(p,3),SPECIAL.shackle,p);blip(560,.06,'triangle');break;
-    case 'glutton':if(!p.used){p.used=true;nearPegs(p,2).forEach(q=>{q.v*=2;q.born=Math.max(q.born,q.v);q.flash=1;zaps.push({x1:p.x,y1:p.y,x2:q.x,y2:q.y,t:0,c:SPECIAL.glutton});popup(q.x,q.y-12,'×2',SPECIAL.glutton,14)});blip(700)}break;
+    case 'glutton':if(!p.used){p.used=true;nearPegs(p,2).forEach(q=>{q.v*=2;q.born=Math.max(q.born,q.v);q.flash=1;zaps.push({x1:p.x,y1:p.y,x2:q.x,y2:q.y,t:0,c:SPECIAL.glutton});popup(q.x,q.y-12,'×2',SPECIAL.glutton,14)});noteDoubled(2);blip(700)}break;
     case 'warp':if(b&&!p.used){p.used=true;burst(b.x,b.y,SPECIAL.warp,14,200);b.x=40+rnd()*(W-80);b.y=DROP_Y+20;b.vx=(rnd()-.5)*120;b.vy=40;burst(b.x,b.y,SPECIAL.warp,14,200);popup(b.x,b.y+20,'WARP',SPECIAL.warp,14);blip(880,.1,'sine')}break;
     case 'bomb':if(!p.spent){p.spent=true;popup(p.x,p.y-12,'BOOM',SPECIAL.bomb,22);shake=9;flash('#ff6a00',.25);blip(110,.2,'sawtooth');explode(p.x,p.y,75)}break;
     case 'num':{
