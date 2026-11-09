@@ -42,6 +42,7 @@ button:disabled{cursor:default}
 .dot.used{background:transparent;border:2px solid var(--line);box-shadow:none}
 #modRow{gap:6px;min-height:14px;font-size:11px;font-weight:800;line-height:14px}
 #hMod{flex:1;min-width:0;color:var(--red);text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:none;border:0;padding:0;font-size:11px;font-weight:800}
+#hMod.soon{color:var(--gold)}
 /* item bar on top of the board */
 #itemBar{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;height:34px;flex:none;align-items:stretch}
 #itemBar::-webkit-scrollbar{display:none}
@@ -245,16 +246,16 @@ const FOODS=[
  {id:'popsicle',n:'Lava Pop',p:3,d:'Pop every 1-peg, scoring each.',use:()=>{popRandom(999,p=>p.v===1,true)}},
 ];
 const ELITES=[
- {id:'heavy',n:'Gravity Audit',d:'Souls fall 40% faster.'},
- {id:'shrink',n:'Budget Cuts',d:'Bucket mults are halved.'},
- {id:'blackout',n:'Power Outage',d:'8 random pegs switch off.'},
- {id:'short',n:'Overtime Ban',d:'1 fewer launch this round.'},
- {id:'tax',n:'Tax Season',d:'Coin sigils and restocks give no coins.'},
+ {id:'heavy',n:'Gravity Audit',d:'Souls fall 40% faster.',tip:'Sulfur Updraft and rubber sigils soften it.'},
+ {id:'shrink',n:'Budget Cuts',d:'Bucket mults are halved.',tip:'Mult relics carry this round better than bucket bonuses.'},
+ {id:'blackout',n:'Power Outage',d:'8 random pegs switch off.',tip:'Blasts and split souls cover the dead spots.'},
+ {id:'short',n:'Overtime Ban',d:'1 fewer launch this round.',tip:'Extra Chute, Overtime Hourglass or a Twisted Pretzel make up the launch.'},
+ {id:'tax',n:'Tax Season',d:'Coin sigils and restocks give no coins.',tip:'Spend before it hits. Tithe Box and Kickback still pay.'},
 ];
 const BOSSES=[
- {id:'foreman',n:'Middle Manager Malphas',d:'Sigils are switched off, gravity is heavy, and he confiscates your biggest peg after every launch.'},
- {id:'gardener',n:'Groundskeeper Gremory',d:'Before every launch, 6 random pegs wither away.'},
- {id:'astronomer',n:'Auditor Astaroth',d:'Buckets shuffle every launch and the middle three pay ×0.5.'},
+ {id:'foreman',n:'Middle Manager Malphas',d:'Sigils are switched off, gravity is heavy, and he confiscates your biggest peg after every launch.',tip:'Sigils are off, so start-of-drop and pop relics have to carry you.'},
+ {id:'gardener',n:'Groundskeeper Gremory',d:'Before every launch, 6 random pegs wither away.',tip:'Fewer pegs to hit: flat mult and start-of-drop relics beat per-hit ones.'},
+ {id:'astronomer',n:'Auditor Astaroth',d:'Buckets shuffle every launch and the middle three pay ×0.5.',tip:'You can\'t aim for buckets. Cracked Halo and raw mult are steadier.'},
 ];
 const QUIPS=[[1,'ADEQUATE.'],[3,'THE AUDITOR IS… TEMPORARILY APPEASED.'],[10,'Upper management has taken an interest.'],[50,'Your supervisor is visibly sweating.'],[250,'Reality is warping. Higher demons are watching.'],[2000,'THE LEDGER CANNOT HOLD THESE NUMBERS.']];
 const ZONES=['Intake Office','Lava Works','Bone Archive','The Abyss'];
@@ -317,13 +318,21 @@ $('muteBtn').textContent=muted?'♪ Off':'♪ On';
 // ---------- board ----------
 const zoneOf=r=>Math.min(3,Math.floor((r-1)/20));
 const baseVal=()=>Math.pow(2,Math.floor(st.round/5));
-function layoutSlots(z){
+const REMODELS=['Standard Issue','The Slant','The Chasm','The Funnel','Twin Pits'];
+// every 5 rounds inside a department the board changes shape; values carry over
+const remodelIdx=r=>{const b=Math.floor((r-1)/5)%4;return b===0?0:1+((b-1+zoneOf(r))%4)};
+const remodelFor=r=>r>1&&(r-1)%5===0&&zoneOf(r)===zoneOf(r-1)&&remodelIdx(r)!==remodelIdx(r-1)?REMODELS[remodelIdx(r)]:null;
+function layoutSlots(z,v=0){
   const pts=[];
   for(let row=0;row<10;row++){
     const y0=132+row*45,even=row%2===0,n=even?8:7;
     for(let i=0;i<n;i++){
       let x=even?25+50*i:50+50*i,y=y0;
       if(z===1&&Math.hypot(x-200,(y-334)*1.15)<70)continue;
+      if(v===1)y+=(x-200)*.12;
+      if(v===2&&row>=3&&row<=8&&Math.abs(x-200)<30)continue;
+      if(v===3&&row>=4&&Math.abs(x-200)>186-(row-3)*11)continue;
+      if(v===4&&(Math.hypot(x-100,y-330)<48||Math.hypot(x-300,y-330)<48))continue;
       if(z===2)y+=14*Math.cos((x-200)/200*Math.PI*.9)-6;
       if(z===3){x+=(rnd()-.5)*10;y+=(rnd()-.5)*10}
       pts.push({x:Math.max(12,Math.min(PW-12,x*PW/W)),y});
@@ -332,8 +341,18 @@ function layoutSlots(z){
   return pts;
 }
 function newPeg(v){const b=baseVal();if(v==null){const r=rnd();v=r<.55?b:r<.85?b*2:b*4}return v}
+function remodelBoard(){
+  const old=st.pegs.filter(p=>p.kind),slots=layoutSlots(zoneOf(st.round),remodelIdx(st.round)),used=new Set();
+  const peg=s=>({x:s.x,y:s.y,kind:null,v:0,born:0,flash:.6,cool:0,used:false,spent:false,off:false,nb:[]});
+  st.pegs=slots.map(peg);
+  for(const p of st.pegs){let bi=-1,bd=40;old.forEach((q,i)=>{if(used.has(i))return;const d=Math.hypot(q.x-p.x,q.y-p.y);if(d<bd){bd=d;bi=i}});
+    if(bi>=0){used.add(bi);const q=old[bi];p.kind=q.kind;p.v=q.v;p.born=q.born}}
+  const left=old.filter((_,i)=>!used.has(i)).sort((a,b)=>(b.kind==='num'?b.v:1e9)-(a.kind==='num'?a.v:1e9));
+  for(const p of st.pegs){if(p.kind||!left.length)continue;const q=left.shift();p.kind=q.kind;p.v=q.v;p.born=q.born}
+  st.pegs.forEach(p=>{p.nb=st.pegs.filter(q=>q!==p&&Math.hypot(q.x-p.x,q.y-p.y)<64)});
+}
 function buildBoard(){
-  const slots=layoutSlots(zoneOf(st.round));
+  const slots=layoutSlots(zoneOf(st.round),remodelIdx(st.round));
   st.pegs=slots.map(s=>({x:s.x,y:s.y,kind:'num',v:newPeg(),born:0,flash:0,cool:0,used:false,spent:false,off:false,nb:[]}));
   st.pegs.forEach(p=>{p.born=p.v;p.nb=st.pegs.filter(q=>q!==p&&Math.hypot(q.x-p.x,q.y-p.y)<64)});
   const idx=shuffle(st.pegs.map((_,i)=>i));let k=0;
@@ -386,6 +405,7 @@ function runItem(i,times){
   const x=st.inv[i];if(!x)return;const it=IT[x.id];if(!it.fn)return;
   if(depth>5)return;depth++;
   let n=times||1;if(st.inv[i-1]&&st.inv[i-1].id==='amp')n*=2;
+  if(D&&D.fx)D.fx[i]=(D.fx[i]||0)+n;
   for(let k=0;k<n;k++){it.fn(x.L,curCtx);x.fired=(x.fired||0)+1;if(st.inv[i+1]&&st.inv[i+1].id==='mirror'){it.fn(x.L,curCtx);st.inv[i+1].fired=(st.inv[i+1].fired||0)+1;flashT[i+1]=performance.now()}}
   flashT[i]=performance.now();depth--;
 }
@@ -433,9 +453,11 @@ function newRun(){
   buildBoard();sel=null;startRound();
 }
 function logEv(s){st.log.events.push({r:st.round,e:s})}
+function rollMod(r){return r%20===0?Object.assign({boss:true},BOSSES[(r/20-1)%3]):r%5===0?pick(ELITES):null}
+const upcomingMod=()=>st&&st.nextMod&&st.nextMod.r===st.round+1?st.nextMod.mod:null;
 function startRound(){
   const r=st.round;st.bucketOrder=null;
-  st.mod=r%20===0?Object.assign({boss:true},BOSSES[(r/20-1)%3]):r%5===0?pick(ELITES):null;
+  st.mod=st.nextMod&&st.nextMod.r===r?st.nextMod.mod:rollMod(r);st.nextMod={r:r+1,mod:rollMod(r+1)};
   st.pegs.forEach(p=>{p.off=false;p.spent=false;p.used=false});
   fillEmpty();
   if(st.mod&&st.mod.id==='blackout')shuffle(st.pegs.slice()).slice(0,8).forEach(p=>p.off=true);
@@ -452,7 +474,7 @@ function spawn(x,y,vx,vy){if(balls.filter(b=>b.alive).length>=16)return;balls.pu
 function tryDrop(pw=.5,ch=0){
   if(!st||st.phase!=='aim'||st.dropsLeft<=0)return;
   st.phase='falling';st.dropNo++;sel=null;renderTray();if(tally)tally.t=Math.max(tally.t,1.6);liveBump.lp=0;liveBump.lm=1;
-  D={points:0,mult:1,hits:0,pops:0,walls:0,bucket:0,bucketBonus:0,firstPop:false,cleared:false,triple:0,espresso:st.espresso};st.espresso=false;
+  D={points:0,mult:1,hits:0,pops:0,walls:0,bucket:0,bucketBonus:0,firstPop:false,cleared:false,triple:0,espresso:st.espresso,fx:{}};st.espresso=false;
   st.pegs.forEach(p=>p.used=false);
   if(st.mod&&st.mod.id==='gardener')shuffle(numPegs()).slice(0,6).forEach(p=>{p.kind=null;p.v=0});
   if(st.mod&&st.mod.id==='astronomer')st.bucketOrder=shuffle([0,1,2,3,4,5,6]);
@@ -534,6 +556,11 @@ function landBall(b){
   D.bucket=Math.max(D.bucket,m+D.bucketBonus);
   bucketFlash[i]=1;popup(i*BW+BW/2,BT-14,'×'+fmt(m+D.bucketBonus),'#fff',16);blip(300+m*120,.12,'square',.04);
 }
+function comboLine(fx){
+  return Object.entries(fx||{}).map(([i,n])=>({i:+i,n})).filter(e=>st.inv[e.i]&&e.n>=2).sort((a,b)=>b.n-a.n).slice(0,2).map(e=>{
+    const amp=st.inv[e.i-1]&&st.inv[e.i-1].id==='amp',mir=st.inv[e.i+1]&&st.inv[e.i+1].id==='mirror';
+    return (amp?'Amp → ':'')+IT[st.inv[e.i].id].n+' '+e.n+'×'+(mir?' + Mirror':'')}).join('  ·  ');
+}
 function finishDrop(){
   fire('end',{});
   let s=D.points*D.mult*Math.max(D.bucket,.5);const tags=[];
@@ -542,10 +569,11 @@ function finishDrop(){
   if(D.espresso){s*=3;tags.push('Espresso ×3')}
   if(has('abyss'))st.pegs.forEach(p=>{if(p.kind==='num'){p.v=Math.floor(p.v/2);if(p.v<=0){p.kind=null;p.v=0}}});
   s=Math.floor(s);
-  st.log.drops.push({r:st.round,d:st.dropNo,pts:+D.points.toFixed(1),mult:+D.mult.toFixed(2),bucket:+D.bucket.toFixed(2),hits:D.hits,pops:D.pops,score:s,pow:D.power||0,hell:D.charge>=1,tags});
+  const combo=comboLine(D.fx);
+  st.log.drops.push({combo,r:st.round,d:st.dropNo,pts:+D.points.toFixed(1),mult:+D.mult.toFixed(2),bucket:+D.bucket.toFixed(2),hits:D.hits,pops:D.pops,score:s,pow:D.power||0,hell:D.charge>=1,tags});
   st.roundScore+=s;st.dropsLeft--;st.bestDrop=Math.max(st.bestDrop,s);
   if(s>best.drop){best.drop=s;save('pegmancer.best2',best)}
-  tally={pts:D.points,mult:D.mult,bucket:Math.max(D.bucket,.5),total:s,t:0,stamped:false,tick:0};
+  tally={pts:D.points,mult:D.mult,bucket:Math.max(D.bucket,.5),total:s,t:0,stamped:false,tick:0,combo};
   const before=st.restocksRound;
   if(!st.quotaHit&&st.roundScore>=st.tgt){st.quotaHit=true;flash('#9cff57',.35);popup(W/2,H/2-110,'QUOTA MET','#9cff57',34);rain(50);fire('quota',{});if(hasPerk('lap'))forceTrigger('all',1);chord([523,659,784])}
   const earned=Math.min(500,Math.floor(st.roundScore/st.tgt))-st.restocksRound;
@@ -593,8 +621,11 @@ function afterRound(head,lines){
 }
 function nextRound(){
   const z=zoneOf(st.round);st.round++;sel=null;
+  const rm=remodelFor(st.round);
   if(zoneOf(st.round)!==z){buildBoard();logEv('Entered '+ZONES[zoneOf(st.round)])}
+  else if(rm){remodelBoard();logEv('Board remodel: '+rm)}
   startRound();
+  if(rm&&zoneOf(st.round)===z){popup(W/2,112,'REMODEL: '+rm.toUpperCase(),'#ffb02e',20);burst(W/2,300,'#ffb02e',30,240,3)}
 }
 
 // ---------- overlays ----------
@@ -684,8 +715,8 @@ function renderMarket(){
   $('contBtn').onclick=()=>{st.frozen=O.items.filter(o=>o.frozen&&!o.sold);nextRound()};
   $('ovExp').onclick=()=>showExport(summaryText(),renderMarket);
 }
-function nextHTML(){const nr=st.round+1,boss=nr%20===0,elite=!boss&&nr%5===0;
-  return `<div class="next">Next: <b>Round ${nr}</b>${zoneOf(nr)!==zoneOf(st.round)?` · new zone: <b>${ZONES[zoneOf(nr)]}</b>`:''}${boss?`<br><span class="boss">Boss: ${BOSSES[(nr/20-1)%3].n}. ${BOSSES[(nr/20-1)%3].d}</span>`:elite?'<br><span class="boss">Surprise audit: a random twist</span>':''}</div>`}
+function nextHTML(){const nr=st.round+1,m=upcomingMod(),rm=zoneOf(nr)===zoneOf(st.round)?remodelFor(nr):null;
+  return `<div class="next">Next: <b>Round ${nr}</b>${zoneOf(nr)!==zoneOf(st.round)?` · new zone: <b>${ZONES[zoneOf(nr)]}</b>`:''}${rm?` · board remodel: <b>${rm}</b>`:''}${m?`<br><span class="boss">${m.boss?'Boss':'Audit'}: ${m.n}. ${m.d}</span><br><small>Tip: ${m.tip}</small>`:''}</div>`}
 function showBlackMarket(back){
   const pool=shuffle(CURSED.filter(c=>!has(c.id))).slice(0,3);
   const full=st.inv.length>=st.slots;
@@ -722,7 +753,7 @@ function showClaw(head,lines){
   showOv(`${sumHTML(head,lines)}<h2 style="font-size:24px">Soul Lottery</h2><div class="tag">Three tries. Stop the claw over a prize. It doesn't always hold on.</div>
    <div class="claw"><div class="rail"></div><div class="hand" id="hand"><i></i><b></b></div><div class="prizes" id="prz">${prizes.map((p,i)=>`<div class="prize" data-p="${i}">?</div>`).join('')}</div></div>
    <button class="big" id="grabBtn" type="button">Grab (3 left)</button><div class="next" id="clawMsg">&nbsp;</div>
-   <button class="chipbtn" id="contBtn" type="button">Skip to round ${st.round+1}</button>`);
+   ${nextHTML()}<button class="chipbtn" id="contBtn" type="button">Skip to round ${st.round+1}</button>`);
   const hand=$('hand'),prz=$('prz');
   const tick=()=>{if(ov.hidden||grabs<=0)return;pos+=dir*.012;if(pos>1){pos=1;dir=-1}if(pos<0){pos=0;dir=1}hand.style.left=`calc(10px + ${pos} * (100% - 20px))`;raf=requestAnimationFrame(tick)};tick();
   $('grabBtn').onclick=()=>{
@@ -753,7 +784,7 @@ function showPerkPick(head,lines,then){
   const pool=shuffle(PERKS.filter(p=>!st.perks.includes(p.id)&&!(p.id==='pocket'&&st.slots>=7))).slice(0,3);
   if(!pool.length)return then();
   showOv(`${sumHTML(head,lines)}<h2 style="font-size:24px">Swear a Binding Oath</h2><div class="tag">Oaths last the whole run and can't be broken.</div>
-   <div class="offers three">${pool.map((p,i)=>`<div class="offer"><div class="ic" style="border-color:#8fe3ff;color:#bdf0ff">★</div><div class="nm">${p.n}</div><div class="ds">${p.d}</div><button class="buy" data-pk="${i}" type="button">Take</button></div>`).join('')}</div>`);
+   <div class="offers three">${pool.map((p,i)=>`<div class="offer"><div class="ic" style="border-color:#8fe3ff;color:#bdf0ff">★</div><div class="nm">${p.n}</div><div class="ds">${p.d}</div><button class="buy" data-pk="${i}" type="button">Take</button></div>`).join('')}</div>${then===nextRound?nextHTML():''}`);
   ovCard.querySelectorAll('[data-pk]').forEach(b=>b.onclick=()=>{const p=pool[+b.dataset.pk];st.perks.push(p.id);if(p.gain)p.gain();logEv('perk '+p.n);chord([523,784]);renderTray();renderBar();then()});
 }
 function showVictory(lines){
@@ -838,7 +869,7 @@ function setLive(h){$('live').innerHTML=h}
 let hudKey='',hudGhost='';
 function updateHud(){
   if(!st)return;
-  const k=[st.round,st.tgt,st.coins,st.roundScore,st.dropsLeft,st.dropsMax,st.lives,st.maxLives,st.mod&&st.mod.id,st.quotaHit,st.phase].join('|');
+  const k=[st.round,st.tgt,st.coins,st.roundScore,st.dropsLeft,st.dropsMax,st.lives,st.maxLives,st.mod&&st.mod.id,st.nextMod&&st.nextMod.r,st.quotaHit,st.phase].join('|');
   if(k===hudKey)return;hudKey=k;
   $('hRound').textContent=st.round+(st.endless?'':'/'+FINAL);$('hTarget').textContent=fmtInt(st.tgt);$('hGold').textContent=fmt(st.coins);
   $('hLives').textContent='♥'.repeat(Math.max(0,st.lives))+'♡'.repeat(Math.max(0,st.maxLives-st.lives));
@@ -846,12 +877,12 @@ function updateHud(){
   $('hScore').textContent=fmtInt(st.roundScore)+' / '+fmtInt(st.tgt)+(ratio>=1?`  (×${fmt(Math.floor(ratio*10)/10)})`:'');
   $('hBar').style.width=Math.min(100,ratio*100)+'%';$('hBar').classList.toggle('over',ratio>=1);
   let d='';for(let i=0;i<st.dropsMax;i++)d+=`<span class="dot ${i<st.dropsMax-st.dropsLeft?'used':''}"></span>`;
-  $('hDrops').innerHTML=d;$('modRow').hidden=!st.mod;
-  $('hMod').textContent=st.mod?(st.mod.boss?'BOSS: ':'Audit: ')+st.mod.n+'. '+st.mod.d+' ⓘ':'';
+  $('hDrops').innerHTML=d;const um=st.log?upcomingMod():null;$('modRow').hidden=!st.mod&&!um;$('hMod').classList.toggle('soon',!st.mod&&!!um);
+  $('hMod').textContent=st.mod?(st.mod.boss?'BOSS: ':'Audit: ')+st.mod.n+'. '+st.mod.d+' ⓘ':um?`Next round · ${um.boss?'BOSS':'Audit'}: ${um.n} ⓘ`:'';
   $('bankBtn').hidden=!(st.quotaHit&&st.phase==='aim'&&st.dropsLeft>0);
   $('bankBtn').textContent=`Bank +${st.dropsLeft*2}c`;
 }
-$('hMod').onclick=()=>{if(!st||!st.mod)return;sel=sel&&sel.t==='mod'?null:{t:'mod'};renderInfo()};
+$('hMod').onclick=()=>{if(!st||!(st.mod||upcomingMod()))return;sel=sel&&sel.t==='mod'?null:{t:'mod'};renderInfo()};
 $('bankBtn').onclick=()=>{if(st&&st.quotaHit&&st.phase==='aim')endRound()};
 function renderBar(){
   const el=$('itemBar');if(!st||!st.inv){el.innerHTML='';return}
@@ -892,7 +923,7 @@ function renderInfo(){
     const e=$('eat');if(e)e.onclick=()=>{const i=sel.i;const r=f.use();if(r===false){el.innerHTML=`<span>${f.n} would do nothing right now.</span>`;return}st.foods.splice(i,1);logEv('ate '+f.n);sel=null;popup(W/2,H/2,f.n+'!','#ffcf9e',20);blip(600,.15,'sine');
       if(st.quotaHit||st.roundScore>=st.tgt){const earned=Math.min(500,Math.floor(st.roundScore/st.tgt))-st.restocksRound;if(earned>0)restock(earned)}
       renderTray();renderBar()};
-  }else if(sel&&sel.t==='mod'&&st.mod){el.innerHTML=`<span><b style="color:var(--red)">${st.mod.boss?'Boss':'Audit'}: ${esc(st.mod.n)}</b> ${esc(st.mod.d)}</span>`
+  }else if(sel&&sel.t==='mod'&&(st.mod||upcomingMod())){const m=st.mod||upcomingMod();el.innerHTML=`<span>${st.mod?'':'<b>Next round</b> · '}<b style="color:var(--red)">${m.boss?'Boss':'Audit'}: ${esc(m.n)}</b> ${esc(m.d)}<br><small style="color:var(--gold)">Tip: ${esc(m.tip)}</small></span>`
   }else if(sel&&sel.t==='perk'){const p=PERKS.find(x=>x.id===st.perks[sel.i]);el.innerHTML=`<span><b>★ ${p.n}</b> ${p.d}</span>`}
   else el.innerHTML='';
   if(el.innerHTML){el.insertAdjacentHTML('beforeend','<button class="mvbtn closeInfo" type="button" aria-label="Close">✕</button>');el.querySelector('.closeInfo').onclick=()=>{sel=null;renderBar();renderInfo()}}
@@ -995,7 +1026,7 @@ function draw(t){
     {const prod=D.points*D.mult,ratio=(st.roundScore+prod)/st.tgt,sz=Math.min(34,20+Math.log10(prod+1)*3.5)*(1+.25*Math.max(liveBump.p,liveBump.m));
      ctx.textAlign='center';ctx.font=Math.round(sz)+'px "Lilita One", sans-serif';ctx.fillStyle=ratio>=1?'#9cff57':ratio>=.5?'#ffb02e':'#fbe9dc';ctx.shadowColor=ctx.fillStyle;ctx.shadowBlur=ratio>=1?14:0;
      ctx.fillText('= '+fmt(prod),CX,DROP_Y+46);ctx.shadowBlur=0}
-  }else{ctx.font='800 9px Nunito, sans-serif';ctx.textAlign='left';if(st&&st.log){ctx.fillStyle='#9cff57';ctx.fillText(ZONES[zoneOf(st.round)].toUpperCase(),8,DROP_Y-22)}else{ctx.fillStyle='#c59a87';ctx.fillText('DRAG TO AIM · RELEASE TO FIRE',8,DROP_Y-22)}if(st&&st.log&&st.phase==='aim'){ctx.textAlign='right';ctx.fillStyle=st.hellUsed?'#5a2318':'#ff6a00';ctx.fillText(st.hellUsed?'HELLFIRE USED':'HOLD STILL: HELLFIRE',W-8,DROP_Y-22)}}
+  }else{ctx.font='800 9px Nunito, sans-serif';ctx.textAlign='left';if(st&&st.log){ctx.fillStyle='#9cff57';ctx.fillText((ZONES[zoneOf(st.round)]+(remodelIdx(st.round)?' · '+REMODELS[remodelIdx(st.round)]:'')).toUpperCase(),8,DROP_Y-22)}else{ctx.fillStyle='#c59a87';ctx.fillText('DRAG TO AIM · RELEASE TO FIRE',8,DROP_Y-22)}if(st&&st.log&&st.phase==='aim'){ctx.textAlign='right';ctx.fillStyle=st.hellUsed?'#5a2318':'#ff6a00';ctx.fillText(st.hellUsed?'HELLFIRE USED':'HOLD STILL: HELLFIRE',W-8,DROP_Y-22)}}
   if(st&&st.log){
     const hotC=chargeNow(),hot=hotC>=1;
     if(st.phase==='aim'){
@@ -1079,7 +1110,7 @@ function draw(t){
   if(tally){
     const T=tally,fade=T.t>1.5?Math.max(0,1-(T.t-1.5)/.4):1,k=Math.min(1,T.t/.8),ease=1-Math.pow(1-k,3);
     const big=Math.min(70,34+Math.log10(T.total+1)*7),punch=T.stamped?1+.35*Math.max(0,1-(T.t-.8)*5):1;
-    ctx.globalAlpha=fade*.82;ctx.fillStyle='#0c0403';const bw=320,bh=big+70,by=H/2-bh/2-20;
+    ctx.globalAlpha=fade*.82;ctx.fillStyle='#0c0403';const bw=340,bh=big+70+(T.combo?22:0),by=H/2-bh/2-20;
     ctx.beginPath();ctx.roundRect?ctx.roundRect(W/2-bw/2,by,bw,bh,16):ctx.rect(W/2-bw/2,by,bw,bh);ctx.fill();
     ctx.globalAlpha=fade;ctx.strokeStyle='#ff6a00';ctx.lineWidth=2;ctx.stroke();
     ctx.textAlign='center';ctx.font='20px "Lilita One", sans-serif';
@@ -1090,6 +1121,7 @@ function draw(t){
     const g=ctx.createLinearGradient(0,-big,0,0);g.addColorStop(0,'#fff3c4');g.addColorStop(.5,'#ffb02e');g.addColorStop(1,'#ff3b2f');
     ctx.font=Math.round(big)+'px "Lilita One", sans-serif';ctx.lineWidth=6;ctx.strokeStyle='#2a0800';
     const shown=T.stamped?T.total:Math.floor(T.total*ease);ctx.strokeText(fmt(shown),0,0);ctx.fillStyle=g;ctx.fillText(fmt(shown),0,0);ctx.restore();
+    if(T.combo){ctx.font='800 12px Nunito, sans-serif';ctx.fillStyle='#ffb02e';let c=T.combo;while(ctx.measureText(c).width>bw-20&&c.length>4)c=c.slice(0,-2);if(c!==T.combo)c=c.trimEnd()+'…';ctx.fillText(c,W/2,by+bh-12)}
     ctx.globalAlpha=1;
   }
   if(flashA>0){ctx.globalAlpha=flashA;ctx.fillStyle=flashC;ctx.fillRect(-10,-10,W+20,H+20);ctx.globalAlpha=1}

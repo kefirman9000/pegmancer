@@ -11,7 +11,9 @@ A darkly comic plinko roguelike. You are a devil intern launching damned souls d
 - **47 relics** with triggers (on hit, on pop, every N pops, on wall, on landing, on quota, on consignment…) that fire left to right. Slot order matters, including the Amplifier and Mirror. Duplicates level up to ×3. Temporary relics burn out after a few rounds.
 - **Up to 7 relic shelves**, plus 12 Binding Oaths that force-trigger relics, and single-use snacks.
 - **Infernal Commissary** (freeze, reroll, board upgrades, extra shelves), **Brimstone Canteen**, **Soul Lottery** claw machine, and the **Black Ledger** of cursed contracts (needs a Ledger Key).
-- 60 rounds across four Departments of Hell, surprise audits every 5 rounds, and a boss every 20 who sabotages your board. Endless mode after that.
+- 60 rounds across four Departments of Hell, audits every 5 rounds, and a boss every 20 who sabotages your board. The next audit or boss is announced a round ahead, with a tip for countering it. Endless mode after that.
+- **Board remodels**: every 5 rounds the board changes shape (The Slant, The Chasm, The Funnel, Twin Pits). Your pegs keep their values.
+- **Combo callouts**: after each launch, the score card names the relics that fired most, including Amplifier and Mirror chains.
 - **Run summary export**: copy or share a full log of the run (every launch, round, purchase and the final build) to send in for balance changes.
 - **Check for updates** on the title screen. The app also checks GitHub at launch and downloads a new version only if you say yes.
 
