@@ -235,6 +235,9 @@ const ITEMS=[
  {id:'meteor',n:'Brimstone Meteor',g:'Me',r:2,trig:'tick',secs:2,d:L=>`Drop ${L} burning meteor${L>1?'s':''} from the top`,fn:L=>{for(let k=0;k<L;k++){const x=30+rnd()*(W-60);spawn(x,DROP_Y,(rnd()-.5)*80,60);const m=balls[balls.length-1];if(m){m.fire=2;m.meteor=true}}}},
  {id:'imps',n:'Imp Swarm',g:'Im',r:1,trig:'firstPop',d:L=>`Release ${L+1} imps from the popped peg`,fn:(L,c)=>{if(c.peg)for(let k=0;k<L+1;k++)spawn(c.peg.x,c.peg.y,(rnd()-.5)*300,-120-rnd()*120)}},
  {id:'anvil',n:'Judgment Hammer',g:'An',r:2,trig:'end',d:L=>`Crush the ${L>1?L+' columns':'column'} under your biggest peg${L>1?'s':''}, popping every peg at full value`,fn:L=>{numPegs().sort((a,b)=>b.v-a.v).slice(0,L).forEach(top=>{const x=top.x;zaps.push({x1:x,y1:0,x2:x,y2:BT,t:0,c:'#c9c9d6'});shake=10;numPegs().filter(q=>Math.abs(q.x-x)<14).forEach(q=>{addPts(q.v);popPeg(q,null)})})}},
+ {id:'fuse',n:'Lit Fuse',g:'LF',r:1,trig:'pop',d:L=>`${15*L}% chance a popped peg bursts, hitting everything next to it`,fn:(L,c)=>{if(c.peg&&rnd()<.15*L){const p=c.peg;blasts.push({x:p.x,y:p.y,r:45,t:0,c:'#ff6a00'});echoHits(numPegs().filter(q=>Math.hypot(q.x-p.x,q.y-p.y)<52),'#ff6a00',p)}}},
+ {id:'domino',n:'Domino Damnation',g:'Dd',r:2,trig:'pop',d:L=>`A popped peg knocks into ${L>1?'the 2 pegs':'the peg'} beside it in its row${L>2?', twice':''}`,fn:(L,c)=>{if(!c.peg)return;const p=c.peg,row=numPegs().filter(q=>Math.abs(q.y-p.y)<8);const l=row.filter(q=>q.x<p.x).sort((a,b)=>b.x-a.x)[0],r=row.filter(q=>q.x>p.x).sort((a,b)=>a.x-b.x)[0];const t=(L>1?[l,r]:[rnd()<.5?l||r:r||l]).filter(Boolean);for(let k=0;k<(L>2?2:1);k++)echoHits(t,'#ffe9c9',p)}},
+ {id:'keg',n:'Powder Keg',g:'PK',r:2,trig:'popN',every:8,d:L=>`Blow up the popped peg, hitting everything within ${50+10*L}px`,fn:(L,c)=>{if(!c.peg)return;const p=c.peg,rad=50+10*L;blasts.push({x:p.x,y:p.y,r:rad,t:0,c:'#ff6a00'});shake=Math.max(shake,5);echoHits(numPegs().filter(q=>Math.hypot(q.x-p.x,q.y-p.y)<rad),'#ff6a00',p)}},
  {id:'rocket',n:'Hellfire Rocket',g:'Rk',r:2,trig:'wallN',every:4,d:L=>`Blast at the soul (size ${L})`,fn:(L,c)=>{const b=c.ball||anyBall();if(b)explode(b.x,b.y,50+15*L)}},
 ];
 const CURSED=[
@@ -254,6 +257,7 @@ const EVOLVED=[
  {id:'treasury',n:'Hell\'s Treasury',g:'HT',r:6,from:['piggy','cashback'],trig:'round',d:()=>'+1 coin per 3 coins you hold (up to 15)',fn:()=>addCoins(Math.min(15,Math.floor(st.coins/3)))},
  {id:'armageddon',n:'Armageddon',g:'Ar',r:6,from:['firecracker','bombbag'],trig:'firstPop',d:()=>'A huge blast that pops everything nearby at full value',fn:(L,c)=>{if(c.peg){explode(c.peg.x,c.peg.y,120,true);shake=16;flash('#ff6a00',.35)}}},
  {id:'grinder',n:'Bone Grinder',g:'BG',r:6,from:['saw','shrapnel'],trig:'hitN',every:5,d:()=>'Pop the 2 pegs nearest the soul',fn:(L,c)=>{const b=c.ball||anyBall();if(b)popNearest(b,2)}},
+ {id:'ruin',n:'Chain of Ruin',g:'CR',r:6,from:['domino','fuse'],trig:'pop',d:()=>'Every popped peg hits the 3 pegs nearest it',fn:(L,c)=>{if(c.peg)echoHits(nearPegs(c.peg,3),'#ff9f43',c.peg)}},
  {id:'tyrant',n:'Tyrant\'s Decree',g:'TD',r:6,from:['usurper','quill'],trig:'start',d:()=>'Points equal to 3× your biggest peg, then your 3 lowest pegs copy it',fn:()=>{const m=maxPeg();addPts(3*m);if(m)numPegs().sort((a,b)=>a.v-b.v).slice(0,3).forEach(p=>{p.v=m;p.born=Math.max(p.born,m);p.flash=1})}},
 ];
 const IT={};ITEMS.concat(CURSED,EVOLVED).forEach(i=>IT[i.id]=i);
@@ -279,6 +283,7 @@ const PERKS=[
  {id:'avarice',n:'Oath of Avarice',d:'When a drop starts, trigger slot 4 once per 7 coins you hold (up to 5).'},
  {id:'emptiness',n:'Oath of Emptiness',d:'When a drop ends, trigger your rightmost item twice per empty slot.'},
  {id:'chaos',n:'Oath of Chaos',d:'Every second a soul is falling, trigger a random item.'},
+ {id:'cascade',n:'Oath of Cascade',d:'Every 10 links in a chain reaction trigger your leftmost item.'},
  {id:'disorder',n:'Oath of Disorder',d:'+1 board scramble every round.'},
 ];
 const FOODS=[
@@ -578,7 +583,7 @@ function spawn(x,y,vx,vy){if(balls.filter(b=>b.alive).length>=16)return;balls.pu
 function tryDrop(pw=.5,ch=0){
   if(!st||st.phase!=='aim'||st.dropsLeft<=0)return;
   st.phase='falling';st.dropNo++;sel=null;renderTray();if(tally)tally.t=Math.max(tally.t,TALLY_END-.3);liveBump.lp=0;liveBump.lm=1;
-  D={points:0,mult:1,hits:0,pops:0,walls:0,bucket:0,bucketBonus:0,firstPop:false,cleared:false,triple:0,espresso:st.espresso,fx:{}};st.espresso=false;
+  D={points:0,mult:1,hits:0,pops:0,walls:0,bucket:0,bucketBonus:0,firstPop:false,cleared:false,triple:0,espresso:st.espresso,fx:{},chainLeft:4000,chain:0,links:0};chainQ.length=0;st.espresso=false;
   st.pegs.forEach(p=>p.used=false);
   if(modIs('gardener'))shuffle(numPegs()).slice(0,6).forEach(p=>{p.kind=null;p.v=0});
   if(modIs('astronomer'))st.bucketOrder=shuffle([0,1,2,3,4,5,6]);
@@ -595,10 +600,27 @@ function tryDrop(pw=.5,ch=0){
 }
 function popup(x,y,text,color='#fff',size=14,slow=1){if(pops.length>140)pops.shift();pops.push({x,y,text,color,size,t:0,k:slow})}
 
-let echo=0;const zaps=[];
+let chainQ=[],curGen=0;const zaps=[];const CHAIN_MS=[[15,'CHAIN ×15','#5ce1ff'],[40,'CHAIN REACTION ×40','#9cff57'],[100,'CHAIN REACTION ×100!','#ffb02e'],[250,'MELTDOWN ×250!!','#ff3b2f'],[1000,'TOTAL MELTDOWN ×1000!!!','#ff4fd8']];
 function nearPegs(p,n){return numPegs().filter(q=>q!==p).sort((a,c)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(c.x-p.x,c.y-p.y)).slice(0,n)}
-// secondary hits from multi-peg relics; they can't set off further multi-peg relics
-function echoHits(list,col,from){if(echo>0||!D)return;echo++;for(const q of list){if(q.kind!=='num'||q.off)continue;if(zaps.length<80)zaps.push(from?{x1:from.x,y1:from.y,x2:q.x,y2:q.y,t:0,c:col}:{x1:q.x,y1:q.y-60,x2:q.x,y2:q.y,t:0,c:col});hitPeg(q,null,true)}echo--}
+// secondary hits are queued as the next link of a chain reaction. Each link lands a beat
+// after the one before, can trigger more relics, and so on. A per-launch budget and a
+// depth cap keep runaway chains from freezing the game.
+function echoHits(list,col,from){
+  if(!D)return;const g=curGen+1;if(g>60)return;const now=performance.now();
+  for(const q of list){if(q.kind!=='num'||q.off)continue;if(D.chainLeft<=0)return;D.chainLeft--;
+    chainQ.push({q,from:from?{x:from.x,y:from.y}:null,col,g,at:now+(g>1?55:20)+rnd()*35})}
+}
+function processChain(){
+  if(!D){chainQ.length=0;return}const now=performance.now();let n=0;
+  chainQ.sort((a,b)=>a.at-b.at);
+  while(chainQ.length&&chainQ[0].at<=now&&n<120){const e=chainQ.shift();n++;const q=e.q;if(q.kind!=='num'||q.off)continue;
+    if(zaps.length<90)zaps.push(e.from?{x1:e.from.x,y1:e.from.y,x2:q.x,y2:q.y,t:0,c:e.col}:{x1:q.x,y1:q.y-60,x2:q.x,y2:q.y,t:0,c:e.col});
+    D.links=(D.links||0)+1;if(e.g>(D.chain||0))D.chain=e.g;
+    for(const [lv,txt,c] of CHAIN_MS)if(D.links===lv){popup(W/2,BT-150,txt,c,lv>=100?26:20,.5);flash(c,.15);chord(lv>=100?[659,880,1175]:[523,784])}
+    curGen=e.g;hitPeg(q,null,true);
+    if(hasPerk('cascade')&&D.links%10===0)forceTrigger('first',1,{peg:q});
+    curGen=0}
+}
 function hitPeg(p,b,blast){
   if(!p.kind||p.off)return;const v0=p.v;
   const now=performance.now();
@@ -649,7 +671,7 @@ function explode(x,y,r,full){
   for(const p of st.pegs){
     if(!p.kind||p.off||p.kind!=='num')continue;
     if(Math.hypot(p.x-x,p.y-y)>r)continue;
-    if(full){addPts(p.v);popPeg(p,null)}else hitPeg(p,null,true);
+    if(full){addPts(p.v);popPeg(p,null)}else if(curGen>0)echoHits([p],'#ff6a00',{x,y});else hitPeg(p,null,true);
   }
   blasts.push({x,y,r,t:0});burst(x,y,'#ff6a00',Math.min(28,r/3|0),r*3,3);depth--;
 }
@@ -690,13 +712,14 @@ function finishDrop(){
   fire('end',{});
   if(hasPerk('emptiness')){const e=st.slots-st.inv.length;if(e>0)forceTrigger('last',2*e)}
   let s=D.points*D.mult*Math.max(D.bucket,.5);const tags=[];
+  if(D.links>=10)tags.push('Chain reaction: '+D.links+' links, '+D.chain+' deep');
   if(D.cleared){s*=2;tags.push('Board cleared ×2')}
   if(st.roundBonus){s*=1+st.roundBonus;tags.push('Overclock +'+Math.round(st.roundBonus*100)+'%')}
   if(D.espresso){s*=3;tags.push('Espresso ×3')}
   if(has('abyss'))st.pegs.forEach(p=>{if(p.kind==='num'){p.v=Math.floor(p.v/2);if(p.v<=0){p.kind=null;p.v=0}}});
   s=Math.floor(s);
   const combo=comboLine(D.fx);
-  st.log.drops.push({combo,r:st.round,d:st.dropNo,pts:+D.points.toFixed(1),mult:+D.mult.toFixed(2),bucket:+D.bucket.toFixed(2),hits:D.hits,pops:D.pops,score:s,pow:D.power||0,hell:D.charge>=1,tags});
+  st.log.drops.push({chain:D.chain,links:D.links,combo,r:st.round,d:st.dropNo,pts:+D.points.toFixed(1),mult:+D.mult.toFixed(2),bucket:+D.bucket.toFixed(2),hits:D.hits,pops:D.pops,score:s,pow:D.power||0,hell:D.charge>=1,tags});
   best.drop0=best.drop;const runPrev=st.bestDrop;
   st.roundScore+=s;st.dropsLeft--;st.bestDrop=Math.max(st.bestDrop,s);
   if(s>best.drop){best.drop=s;save('pegmancer.best2',best)}
@@ -1326,11 +1349,12 @@ function frame(t){
   if(kbPull&&st&&st.phase==='aim')setPull(pull+dt*1.1);
   if(TOUCH&&dragging&&st){const hot=chargeNow()>=1;if(hot!==fireBtn.classList.contains('hot')){fireBtn.classList.toggle('hot',hot);fireBtn.textContent=hot?'Hellfire!':'Launch'}}
   else if(fireBtn.classList.contains('hot')){fireBtn.classList.remove('hot');fireBtn.textContent='Launch'}
-  if(st&&st.log&&(st.phase==='falling'||balls.some(b=>b.alive))){
+  if(st&&st.log&&(st.phase==='falling'||balls.some(b=>b.alive)||chainQ.length)){
     for(let i=0;i<5;i++)step(dt/5);
+    if(st.phase==='falling'&&D&&chainQ.length)processChain();
     if(st.phase==='falling'&&D){
-      if(balls.some(b=>b.alive))setLive(`<span>${fmt(D.points)}</span> <span class="x">× ${fmt(D.mult)}</span> <small>${D.hits} hits · ${D.pops} pops</small>`);
-      else if(!st.launchAnim){balls=[];finishDrop()}
+      if(balls.some(b=>b.alive)||chainQ.length)setLive(`<span>${fmt(D.points)}</span> <span class="x">× ${fmt(D.mult)}</span> <small>${D.hits} hits · ${D.pops} pops</small>`);
+      else if(!st.launchAnim&&!chainQ.length){balls=[];finishDrop()}
     }
   }
   pops.forEach(p=>p.t+=dt*.9*(p.k||1));pops=pops.filter(p=>p.t<1);
