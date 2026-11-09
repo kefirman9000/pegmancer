@@ -1,0 +1,640 @@
+<title>Pegmancer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@500;700;800&display=swap">
+<style>
+/* Layout: one-screen arcade cabinet — HUD strip, board canvas filling the middle, relic tray below; overlays for title/shop/game over */
+:root{
+  --bg:#130f26; --panel:#1f1940; --panel2:#2a2354; --line:#3b3272;
+  --fg:#f3efff; --muted:#a69dd3; --gold:#ffc93c; --red:#ff4d6d; --blue:#5aa9ff; --teal:#2de2c8; --good:#5fdc6a;
+  --display:'Lilita One', 'Arial Rounded MT Bold', 'Trebuchet MS', sans-serif;
+  --body:'Nunito', 'Segoe UI', system-ui, sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);overflow:hidden;touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+#app{height:100%;display:flex;flex-direction:column;max-width:560px;margin:0 auto;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:8px;gap:6px}
+#hud{display:flex;flex-direction:column;gap:6px}
+.row{display:flex;align-items:center;gap:8px}
+.stat{display:flex;flex-direction:column;line-height:1.05;min-width:0}
+.stat span{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:800}
+.stat b{font-family:var(--display);font-weight:400;font-size:22px;font-variant-numeric:tabular-nums}
+.stat.gold b{color:var(--gold)}
+.spacer{flex:1}
+.chipbtn{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:12px;font-weight:800;color:var(--muted)}
+.bar{position:relative;height:22px;border-radius:11px;background:var(--panel);border:1px solid var(--line);overflow:hidden}
+#hBar{position:absolute;inset:0 auto 0 0;width:0;background:linear-gradient(90deg,#6b4dff,#ff4d6d);transition:width .35s ease}
+#hScore{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;font-variant-numeric:tabular-nums;text-shadow:0 1px 2px #0008}
+#hDrops{display:flex;gap:5px;align-items:center;font-size:12px;color:var(--muted);font-weight:800}
+.dot{width:12px;height:12px;border-radius:50%;background:var(--fg);box-shadow:0 0 6px #fff8}
+.dot.used{background:transparent;border:2px solid var(--line);box-shadow:none}
+#hBoss{font-size:12px;font-weight:800;color:var(--red);text-align:right;min-width:0}
+#stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative}
+canvas{display:block;border-radius:14px;touch-action:none}
+#live{text-align:center;font-family:var(--display);font-size:22px;min-height:28px;font-variant-numeric:tabular-nums}
+#live .x{color:var(--red)}
+#live small{font-family:var(--body);font-size:12px;color:var(--muted);font-weight:700}
+#relics{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;min-height:34px}
+.relic{width:34px;height:34px;border-radius:9px;border:2px solid var(--line);background:var(--panel);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:13px;padding:0}
+.relic.empty{border-style:dashed;opacity:.4;cursor:default}
+#info{font-size:12.5px;color:var(--muted);text-align:center;min-height:18px;display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap}
+#info b{color:var(--fg)}
+.overlay{position:fixed;inset:0;background:#0b0818e6;display:flex;justify-content:center;overflow-y:auto;z-index:20;padding-top:calc(env(safe-area-inset-top,0px) + 16px);padding-bottom:calc(env(safe-area-inset-bottom,0px) + 16px);padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
+.overlay[hidden],[hidden]{display:none!important}
+.card{width:100%;max-width:520px;margin:auto 0;display:flex;flex-direction:column;gap:14px}
+.logo{font-family:var(--display);font-size:clamp(44px,13vw,68px);line-height:.9;text-align:center;background:linear-gradient(180deg,#fff 10%,#ffc93c 55%,#ff4d6d);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 4px 0 #3b1c5a)}
+.tag{text-align:center;color:var(--muted);font-weight:700;text-wrap:balance}
+h2{font-family:var(--display);font-weight:400;font-size:30px;margin:0;text-align:center;text-wrap:balance}
+h3{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:4px 0 0;font-weight:800}
+.big{font-family:var(--display);font-size:20px;background:var(--gold);color:#2a1a00;border:0;border-radius:14px;padding:14px 18px;box-shadow:0 4px 0 #b3800f}
+.big:active{transform:translateY(2px);box-shadow:0 2px 0 #b3800f}
+.legend{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px 12px;font-size:13px}
+.legend div{display:flex;gap:8px;align-items:center}
+.pd{width:14px;height:14px;border-radius:50%;flex:none}
+.how{font-size:13.5px;line-height:1.5;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.how p{margin:0 0 6px}.how p:last-child{margin:0}
+.sum{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px;display:flex;flex-direction:column;gap:3px;font-size:13.5px;font-variant-numeric:tabular-nums}
+.sum div{display:flex;justify-content:space-between;gap:12px}
+.sum .tot{border-top:1px solid var(--line);padding-top:5px;margin-top:3px;font-weight:800;color:var(--gold)}
+.offers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.offers.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+.offer{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:6px;min-width:0;text-align:left}
+.offer .ic{width:36px;height:36px;border-radius:9px;border:2px solid;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:14px}
+.offer .nm{font-weight:800;font-size:13.5px;line-height:1.15}
+.offer .ds{font-size:12px;color:var(--muted);line-height:1.35;flex:1}
+.offer .rar{font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:800}
+.buy{border:0;border-radius:9px;padding:8px;font-weight:800;background:var(--gold);color:#2a1a00}
+.buy:disabled{background:var(--panel2);color:var(--muted);cursor:default}
+.offer.sold{opacity:.45}
+.shoprow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.owned{display:flex;gap:6px;flex-wrap:wrap}
+.next{text-align:center;font-weight:700;color:var(--muted);font-size:13.5px}
+.next b{color:var(--fg)}.next .boss{color:var(--red)}
+.sellbtn{background:transparent;border:1px solid var(--red);color:var(--red);border-radius:8px;padding:3px 9px;font-size:12px;font-weight:800}
+@media (max-width:400px){.offers{grid-template-columns:repeat(2,minmax(0,1fr))}.stat b{font-size:19px}}
+@media (prefers-reduced-motion:reduce){#hBar{transition:none}}
+</style>
+
+<div id="app">
+  <header id="hud">
+    <div class="row">
+      <div class="stat"><span>Round</span><b id="hRound">1</b></div>
+      <div class="stat"><span>Target</span><b id="hTarget">0</b></div>
+      <div class="stat gold"><span>Gold</span><b id="hGold">0</b></div>
+      <div class="spacer"></div>
+      <button class="chipbtn" id="hudExp" type="button">Export</button>
+      <button class="chipbtn" id="muteBtn" type="button">Sound on</button>
+    </div>
+    <div class="bar"><div id="hBar"></div><span id="hScore">0 / 0</span></div>
+    <div class="row"><div id="hDrops"></div><div class="spacer"></div><div id="hBoss"></div></div>
+  </header>
+  <div id="stage"><canvas id="cv" aria-label="Peg board. Move to aim, tap to drop a ball."></canvas></div>
+  <div id="live">Tap the board to drop</div>
+  <div id="relics"></div>
+  <div id="info"></div>
+</div>
+<div id="ov" class="overlay" hidden><div class="card" id="ovCard"></div></div>
+
+<script>
+(()=>{
+const W=400,H=660,DROP_Y=62,BT=598,NB=7,BW=W/NB,PR=7,BASE_R=7;
+const COL={basic:'#5aa9ff',mult:'#ff4d6d',gold:'#ffc93c',bumper:'#b26bff',splitter:'#2de2c8',crit:'#ff9be0',bomb:'#ff8a3d',post:'#4a3f86'};
+const PEGINFO=[['basic','Blue: points'],['mult','Red: +mult'],['gold','Gold: +1 gold'],['bumper','Purple: big bounce'],['splitter','Teal: splits the ball'],['crit','Pink: doubles mult'],['bomb','Orange: +15 points']];
+const RAR={1:{n:'Common',c:'#a69dd3',p:4},2:{n:'Uncommon',c:'#2de2c8',p:6},3:{n:'Rare',c:'#ff9be0',p:9}};
+const RELICS=[
+ {id:'lead',n:'Lead Core',g:'Pb',c:'#9fb4c7',r:1,d:'Blue pegs give +1 point.'},
+ {id:'ink',n:'Red Ink',g:'R+',c:'#ff4d6d',r:1,d:'Red pegs give +0.5 more mult.'},
+ {id:'spare',n:'Spare Ball',g:'+1',c:'#f3efff',r:2,d:'+1 drop every round.'},
+ {id:'twin',n:'Twin Hopper',g:'II',c:'#2de2c8',r:2,d:'Every 3rd drop releases 2 balls.'},
+ {id:'rubber',n:'Rubber Walls',g:'||',c:'#7dd87d',r:1,d:'Bouncing off a side wall gives +3 points.'},
+ {id:'glass',n:'Glass Cannon',g:'GC',c:'#bde7ff',r:3,d:'Drops score ×1.6, but you get 1 fewer drop per round.'},
+ {id:'snow',n:'Snowball',g:'SB',c:'#e8f4ff',r:2,d:'Every 10 hits in one drop gives +1 mult.'},
+ {id:'clover',n:'Four Leaf',g:'4L',c:'#5fdc6a',r:1,d:'15% chance a peg hit scores double points.'},
+ {id:'die',n:'Loaded Die',g:'D6',c:'#ffd0a8',r:1,d:'Each drop starts with +1 to +4 mult.'},
+ {id:'last',n:'Last Call',g:'LC',c:'#ff8a3d',r:2,d:'Your final drop of each round scores ×2.'},
+ {id:'head',n:'Head Start',g:'HS',c:'#ffe27a',r:1,d:'Your first drop of each round scores ×1.5.'},
+ {id:'haggle',n:'Haggler',g:'$-',c:'#ffc93c',r:1,d:'Rerolls cost 1 less.'},
+ {id:'coupon',n:'Coupon Book',g:'%',c:'#ffc93c',r:2,d:'Shop items cost 25% less.'},
+ {id:'midas',n:'Midas Touch',g:'Au',c:'#ffc93c',r:2,d:'Every 15th hit in a drop gives 1 gold.'},
+ {id:'frenzy',n:'Frenzy',g:'!!',c:'#ff4d6d',r:3,d:'Drops with 40 or more hits score ×2.'},
+ {id:'feather',n:'Feather Fall',g:'FF',c:'#d9d2ff',r:2,d:'Gravity is 25% lower, so balls hit more pegs.'},
+ {id:'wind',n:'Second Wind',g:'SW',c:'#8fe3ff',r:2,d:'Once per round, a ball landing in the centre bucket goes back to the top.'},
+ {id:'prism',n:'Prism',g:'<>',c:'#2de2c8',r:2,d:'Teal splitter pegs release 2 balls instead of 1.'},
+ {id:'collector',n:'Collector',g:'Co',c:'#c9a3ff',r:2,d:'Each drop starts with +0.3 mult for every relic you own.'},
+ {id:'overtime',n:'Overtime',g:'OT',c:'#ffc93c',r:1,d:'Unused drops pay 3 gold each instead of 1.'},
+ {id:'compound',n:'Compound',g:'%%',c:'#ff7f9a',r:3,d:'Red pegs also multiply your mult by ×1.08.'},
+ {id:'piggy',n:'Piggy Bank',g:'PB',c:'#ffa8c5',r:1,d:'Interest cap rises from 5 to 10 gold.'},
+ {id:'lode',n:'Lodestone',g:'Fe',c:'#ff4d6d',r:3,d:'Balls are pulled gently toward red pegs.'},
+ {id:'big',n:'Big Ball',g:'O',c:'#f3efff',r:2,d:'Balls are 40% larger and hit more pegs.'},
+ {id:'bounty',n:'Bounty',g:'B$',c:'#ffc93c',r:1,d:'Gold pegs give +2 more gold.'},
+ {id:'sharp',n:'Sharp Edge',g:'x3',c:'#ff9be0',r:3,d:'Pink crit pegs multiply mult by ×3 instead of ×2.'},
+ {id:'fuse',n:'Long Fuse',g:'LF',c:'#ff8a3d',r:2,d:'Orange bomb pegs give 30 points and recharge every drop.'},
+ {id:'echo',n:'Echo',g:'Ec',c:'#a0f0ff',r:2,d:'The first 5 hits of each drop count twice.'},
+ {id:'nudge',n:'Wind Charm',g:'<~',c:'#8fe3ff',r:2,d:'While a ball falls, tap left or right of it to nudge it. 3 nudges per drop.'},
+ {id:'jackpot',n:'Jackpot',g:'JP',c:'#ffc93c',r:2,d:'The centre bucket becomes ×5.'},
+ {id:'chain',n:'Chain Reaction',g:'CR',c:'#b26bff',r:1,d:'Purple bumper hits give +0.25 mult.'},
+ {id:'seven',n:'Lucky Seven',g:'7',c:'#5fdc6a',r:1,d:'Every 7th hit in a drop gives +7 points.'},
+ {id:'hoard',n:'Dragon Hoard',g:'DH',c:'#ffc93c',r:3,d:'Each drop starts with +1 mult for every 10 gold you hold.'},
+ {id:'rebate',n:'Rebate',g:'Rb',c:'#7dd87d',r:1,d:'Get 1 gold back every time you buy something.'},
+ {id:'magnum',n:'Magnum Bombs',g:'MB',c:'#ff8a3d',r:2,d:'Bomb pegs also give +2 mult.'},
+ {id:'goldrush',n:'Gold Rush',g:'GR',c:'#ffc93c',r:2,d:'Gold pegs also give +3 points.'},
+];
+const UPG=[
+ {id:'sharpen',n:'Sharpen Pegs',t:'basic',d:'All blue pegs give +1 point.',p:4},
+ {id:'addRed',n:'Red Pegs',t:'mult',d:'Turn 2 blue pegs red. Red adds +1 mult.',p:4},
+ {id:'addGold',n:'Gold Pegs',t:'gold',d:'Turn 2 blue pegs gold. Gold gives 1 gold per hit.',p:3},
+ {id:'addBump',n:'Bumpers',t:'bumper',d:'Turn 2 blue pegs into purple bumpers. +2 points and a big bounce.',p:3},
+ {id:'addSplit',n:'Splitter Peg',t:'splitter',d:'Turn 1 blue peg teal. It splits the ball once per drop.',p:5},
+ {id:'addCrit',n:'Crit Peg',t:'crit',d:'Turn 1 blue peg pink. It doubles your mult once per drop.',p:6},
+ {id:'addBomb',n:'Bomb Pegs',t:'bomb',d:'Turn 2 blue pegs orange. +15 points, once per round.',p:4},
+ {id:'edges',n:'Wider Payouts',t:'post',d:'The two outer buckets get +1 mult.',p:5},
+ {id:'hotred',n:'Red Hot',t:'mult',d:'Red pegs give +0.5 more mult.',p:5},
+ {id:'hopper',n:'Extra Hopper',t:'post',d:'+1 drop every round, for the rest of the run.',p:9},
+];
+const BOSSES=[
+ {id:'heavy',n:'Heavy Gravity',d:'Balls fall 40% faster.'},
+ {id:'shrink',n:'Tight Buckets',d:'Bucket mults are halved.'},
+ {id:'blackout',n:'Blackout',d:'8 random pegs switch off.'},
+ {id:'short',n:'Short Fuse',d:'1 fewer drop this round.'},
+ {id:'tax',n:'Tax Man',d:'Gold pegs give no gold.'},
+];
+const MAX_RELICS=8;
+const APPB=window.PegmancerApp||null;
+const VERSION=(()=>{try{return APPB?APPB.version():'web'}catch(e){return 'web'}})();
+
+const $=id=>document.getElementById(id);
+const cv=$('cv'),ctx=cv.getContext('2d'),stage=$('stage'),ov=$('ov'),ovCard=$('ovCard');
+let scale=1;
+const rnd=Math.random, pick=a=>a[Math.floor(rnd()*a.length)];
+const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+const fmt=n=>{if(n>=1e6)return (n/1e6).toFixed(2)+'M';if(n>=1e4)return Math.round(n/1e3)+'k';return Number.isInteger(n)?String(n):n.toFixed(n<10?2:1).replace(/\.?0+$/,'')};
+const fmtInt=n=>Math.floor(n).toLocaleString();
+function load(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}}
+function save(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+
+let st=null, D=null, balls=[], pops=[], aimX=W/2, pressing=false, selRelic=null, shake=0;
+let best=load('pegmancer.best',{round:0,drop:0});
+const has=id=>st&&st.relics.some(r=>r.id===id);
+
+// ---------- audio ----------
+let ac=null,muted=load('pegmancer.muted',false),lastBlip=0;
+function initAudio(){if(ac)return;try{ac=new (window.AudioContext||window.webkitAudioContext)()}catch(e){ac=null}}
+function blip(f,d=.06,type='triangle',v=.05){
+  if(muted||!ac)return;const now=ac.currentTime;if(now-lastBlip<.018)return;lastBlip=now;
+  const o=ac.createOscillator(),g=ac.createGain();o.type=type;o.frequency.setValueAtTime(f,now);o.frequency.exponentialRampToValueAtTime(f*1.5,now+d);
+  g.gain.setValueAtTime(v,now);g.gain.exponentialRampToValueAtTime(.0001,now+d);o.connect(g).connect(ac.destination);o.start(now);o.stop(now+d+.02);
+}
+function chord(fs){fs.forEach((f,i)=>setTimeout(()=>{lastBlip=0;blip(f,.18,'square',.035)},i*70))}
+$('muteBtn').onclick=()=>{muted=!muted;save('pegmancer.muted',muted);$('muteBtn').textContent=muted?'Sound off':'Sound on';initAudio()};
+$('muteBtn').textContent=muted?'Sound off':'Sound on';
+$('hudExp').onclick=()=>{if(st&&st.log&&ov.hidden)showExport(summaryText(),hideOv)};
+
+// ---------- board ----------
+function buildPegs(){
+  const pegs=[];
+  for(let row=0;row<10;row++){
+    const y=136+row*44, even=row%2===0, n=even?8:7;
+    for(let i=0;i<n;i++) pegs.push({x:even?25+50*i:50+50*i,y,type:'basic',flash:0,cool:0,used:false,spent:false,off:false});
+  }
+  const idx=shuffle(pegs.map((_,i)=>i));
+  for(let k=0;k<5;k++)pegs[idx[k]].type='mult';
+  for(let k=5;k<8;k++)pegs[idx[k]].type='gold';
+  pegs[idx[8]].type='bumper';
+  return pegs;
+}
+const posts=[];for(let i=1;i<NB;i++)posts.push({x:i*BW,y:BT,type:'post'});
+function bucketMult(i){
+  let m=[4,2,1.5,1,1.5,2,4][i];
+  if(i===3&&has('jackpot'))m=5;
+  if((i===0||i===6))m+=st.perm.edge;
+  if(st.boss&&st.boss.id==='shrink')m=Math.max(.5,m/2);
+  return m;
+}
+function convert(type,n){
+  const c=shuffle(st.pegs.filter(p=>p.type==='basic'));
+  c.slice(0,n).forEach(p=>{p.type=type;p.flash=1});
+  return c.length>0;
+}
+function target(n){const t=80*Math.pow(1.5,n-1)*(n%4===0?1.35:1);const mag=Math.pow(10,Math.max(0,Math.floor(Math.log10(t))-1));return Math.round(t/mag)*mag}
+
+// ---------- run flow ----------
+function newRun(){
+  st={round:1,gold:4,relics:[],pegs:buildPegs(),perm:{lvl:0,red:0,edge:0,drops:0},boss:null,nextBoss:pick(BOSSES),
+      dropsLeft:0,dropsMax:0,dropNo:0,roundScore:0,target:0,windUsed:false,nudges:0,phase:'aim',bestDrop:0,rerolls:0,offers:null,
+      log:{started:new Date().toISOString(),drops:[],rounds:[],shop:[]}};
+  selRelic=null;startRound();
+}
+function startRound(){
+  st.boss=st.round%4===0?st.nextBoss:null;
+  st.pegs.forEach(p=>{p.off=false;p.spent=false;p.used=false});
+  if(st.boss&&st.boss.id==='blackout')shuffle(st.pegs.slice()).slice(0,8).forEach(p=>p.off=true);
+  st.dropsMax=Math.max(1,5+(has('spare')?1:0)+st.perm.drops-(has('glass')?1:0)-(st.boss&&st.boss.id==='short'?1:0));
+  st.dropsLeft=st.dropsMax;st.dropNo=0;st.roundScore=0;st.target=target(st.round);st.windUsed=false;
+  st.phase='aim';D=null;balls=[];
+  setLive('Tap the board to drop');hideOv();renderRelics();
+}
+function gravity(){let g=950;if(has('feather'))g*=.75;if(st.boss&&st.boss.id==='heavy')g*=1.4;return g}
+function ballR(){return has('big')?BASE_R*1.4:BASE_R}
+function spawn(x,y,vx,vy){if(balls.filter(b=>b.alive).length>=14)return;balls.push({x,y,vx,vy,alive:true,t:0,still:0,bin:-1,trail:[]})}
+function tryDrop(){
+  if(!st||st.phase!=='aim'||st.dropsLeft<=0)return;
+  st.phase='falling';st.dropNo++;
+  D={points:0,mult:1,hits:0,bucket:0};
+  if(has('die'))D.mult+=1+Math.floor(rnd()*4);
+  if(has('collector'))D.mult+=.3*st.relics.length;
+  if(has('hoard'))D.mult+=Math.floor(st.gold/10);
+  st.nudges=has('nudge')?3:0;
+  st.pegs.forEach(p=>p.used=false);
+  const twin=has('twin')&&st.dropNo%3===0;
+  if(twin){spawn(aimX-8,DROP_Y,-20,0);spawn(aimX+8,DROP_Y,20,0)}else spawn(aimX,DROP_Y,(rnd()-.5)*10,0);
+  blip(220,.08,'sine',.06);
+}
+function popup(x,y,text,color='#fff',size=14){pops.push({x,y,text,color,size,t:0})}
+
+function hitPeg(p,b){
+  if(p.type==='post')return;
+  const now=performance.now();if(now<p.cool)return;p.cool=now+90;p.flash=1;
+  D.hits++;let pts=0,gold=0,f=440;
+  const tax=st.boss&&st.boss.id==='tax';
+  switch(p.type){
+    case 'basic':pts=1+st.perm.lvl+(has('lead')?1:0);f=520+Math.min(D.hits,40)*12;break;
+    case 'mult':{const m=1+st.perm.red+(has('ink')?.5:0);D.mult+=m;if(has('compound'))D.mult*=1.08;popup(p.x,p.y-12,'+'+fmt(m)+' mult',COL.mult,13);f=330;break}
+    case 'gold':pts=1+(has('goldrush')?3:0);gold=tax?0:1+(has('bounty')?2:0);if(gold)popup(p.x,p.y-12,'+'+gold+'g',COL.gold,13);f=880;break;
+    case 'bumper':pts=2;if(has('chain'))D.mult+=.25;f=260;break;
+    case 'splitter':pts=1;if(!p.used){p.used=true;const n=has('prism')?2:1;for(let i=0;i<n;i++)spawn(b.x,b.y,(i%2?1:-1)*(120+rnd()*60)*(n===1?(rnd()<.5?1:-1):1),-60);popup(p.x,p.y-12,'Split!',COL.splitter,13);f=660}break;
+    case 'crit':if(!p.used){p.used=true;const m=has('sharp')?3:2;D.mult*=m;popup(p.x,p.y-12,'×'+m+' mult',COL.crit,15);shake=5;f=990}else pts=1;break;
+    case 'bomb':if(!p.spent){p.spent=true;pts=has('fuse')?30:15;if(has('magnum'))D.mult+=2;popup(p.x,p.y-12,'BOOM +'+pts,COL.bomb,15);shake=7;f=110}else pts=1;break;
+  }
+  if(has('echo')&&D.hits<=5)pts*=2;
+  if(pts&&has('clover')&&rnd()<.15){pts*=2;popup(p.x+10,p.y+4,'×2',COL.gold,11)}
+  if(has('seven')&&D.hits%7===0){pts+=7;popup(p.x,p.y+14,'+7',COL.good,12)}
+  if(has('midas')&&D.hits%15===0){gold+=1;popup(p.x,p.y+14,'+1g',COL.gold,12)}
+  if(has('snow')&&D.hits%10===0){D.mult+=1;popup(p.x,p.y+14,'+1 mult',COL.mult,12)}
+  if(pts&&p.type==='basic')popup(p.x,p.y-10,'+'+pts,'#cfe4ff',11);
+  D.points+=pts;st.gold+=gold;
+  blip(f);
+}
+function landBall(b){
+  const i=Math.max(0,Math.min(NB-1,b.bin>=0?b.bin:Math.floor(b.x/BW)));
+  if(i===3&&has('wind')&&!st.windUsed){st.windUsed=true;b.x=aimX;b.y=DROP_Y;b.vx=0;b.vy=0;b.bin=-1;b.t=0;b.trail=[];popup(W/2,BT-20,'Second Wind!',COL.splitter,16);blip(700,.15,'sine');return}
+  b.alive=false;const m=bucketMult(i);D.bucket=Math.max(D.bucket,m);
+  bucketFlash[i]=1;popup(i*BW+BW/2,BT-14,'×'+fmt(m),'#fff',16);blip(300+m*120,.12,'square',.04);
+}
+const bucketFlash=new Array(NB).fill(0);
+function finishDrop(){
+  let s=D.points*D.mult*D.bucket;const tags=[];
+  if(has('glass')){s*=1.6;tags.push('Glass ×1.6')}
+  if(has('head')&&st.dropNo===1){s*=1.5;tags.push('Head Start ×1.5')}
+  if(has('last')&&st.dropsLeft===1){s*=2;tags.push('Last Call ×2')}
+  if(has('frenzy')&&D.hits>=40){s*=2;tags.push('Frenzy ×2')}
+  s=Math.floor(s);
+  st.log.drops.push({r:st.round,d:st.dropNo,pts:+D.points.toFixed(2),mult:+D.mult.toFixed(2),bucket:D.bucket,hits:D.hits,score:s,tags});
+  st.roundScore+=s;st.dropsLeft--;st.bestDrop=Math.max(st.bestDrop,s);
+  if(s>best.drop){best.drop=s;save('pegmancer.best',best)}
+  if(has('fuse'))st.pegs.forEach(p=>p.spent=false);
+  popup(W/2,H/2-30,'+'+fmtInt(s),'#fff',34);
+  setLive(`<span>${fmt(D.points)}</span> <span class="x">× ${fmt(D.mult)}</span> × ${fmt(D.bucket)} = ${fmtInt(s)}${tags.length?'<br><small>'+tags.join(' · ')+'</small>':''}`);
+  if(st.roundScore>=st.target){st.phase='between';chord([523,659,784,1046]);setTimeout(roundWon,1200)}
+  else if(st.dropsLeft<=0){st.phase='between';chord([392,330,262]);setTimeout(gameOver,1200)}
+  else st.phase='aim';
+}
+function roundWon(){
+  const base=4+Math.floor(st.round/3);
+  const left=st.dropsLeft*(has('overtime')?3:1);
+  const interest=Math.min(Math.floor(st.gold/5),has('piggy')?10:5);
+  const bossBonus=st.boss?5:0;
+  const lines=[['Round reward',base],[`Unused drops (${st.dropsLeft})`,left],['Interest',interest]];
+  if(bossBonus)lines.push(['Boss beaten',bossBonus]);
+  const total=base+left+interest+bossBonus;st.gold+=total;
+  st.log.rounds.push({r:st.round,target:st.target,score:st.roundScore,won:true,dropsUsed:st.dropsMax-st.dropsLeft,dropsMax:st.dropsMax,goldEarned:total,goldAfter:st.gold,boss:st.boss?st.boss.n:null});
+  if(st.round>best.round){best.round=st.round;save('pegmancer.best',best)}
+  if(st.boss)st.nextBoss=pick(BOSSES);
+  st.rerolls=0;st.offers=rollOffers();
+  showShop(lines,total);
+}
+function priceOf(p){let v=p;if(has('coupon'))v=Math.ceil(v*.75);return v}
+function rerollCost(){return Math.max(1,2+st.rerolls-(has('haggle')?1:0))}
+function rollOffers(){
+  const pool=RELICS.filter(r=>!has(r.id));
+  const weighted=[];pool.forEach(r=>{const w=r.r===1?5:r.r===2?3:1;for(let i=0;i<w;i++)weighted.push(r)});
+  const rel=[];shuffle(weighted);for(const r of weighted){if(!rel.includes(r))rel.push(r);if(rel.length===3)break}
+  const upg=shuffle(UPG.slice()).slice(0,2);
+  return {rel:rel.map(r=>({kind:'relic',item:r,sold:false})),upg:upg.map(u=>({kind:'upg',item:u,sold:false}))};
+}
+function applyUpg(u){
+  switch(u.id){
+    case 'sharpen':st.perm.lvl++;break;case 'addRed':convert('mult',2);break;case 'addGold':convert('gold',2);break;
+    case 'addBump':convert('bumper',2);break;case 'addSplit':convert('splitter',1);break;case 'addCrit':convert('crit',1);break;
+    case 'addBomb':convert('bomb',2);break;case 'edges':st.perm.edge++;break;case 'hotred':st.perm.red+=.5;break;case 'hopper':st.perm.drops++;break;
+  }
+}
+function buy(o){
+  const price=priceOf(o.kind==='relic'?RAR[o.item.r].p:o.item.p);
+  if(o.sold||st.gold<price)return;
+  if(o.kind==='relic'&&st.relics.length>=MAX_RELICS)return;
+  st.gold-=price;o.sold=true;
+  st.log.shop.push({r:st.round,act:'buy',kind:o.kind,name:o.item.n,price});
+  if(o.kind==='relic')st.relics.push(o.item);else applyUpg(o.item);
+  if(has('rebate'))st.gold+=1;
+  chord([660,880]);renderRelics();rerenderShop();
+}
+function sellRelic(r){const v=Math.floor(RAR[r.r].p/2);st.log.shop.push({r:st.round,act:'sell',kind:'relic',name:r.n,price:v});st.relics=st.relics.filter(x=>x!==r);st.gold+=v;selRelic=null;renderRelics();if(!ov.hidden&&shopState)rerenderShop();else renderInfo()}
+
+// ---------- overlays ----------
+let shopState=null;
+function hideOv(){ov.hidden=true;shopState=null}
+function showOv(html){ovCard.innerHTML=html;ov.hidden=false;ov.scrollTop=0}
+function legendHTML(){return '<div class="legend">'+PEGINFO.map(([t,l])=>`<div><span class="pd" style="background:${COL[t]};box-shadow:0 0 8px ${COL[t]}"></span>${l}</div>`).join('')+'</div>'}
+function showTitle(){
+  shopState=null;
+  showOv(`<div class="logo">PEG<br>MANCER</div>
+  <div class="tag">Drop balls, rack up points × mult, and build a broken combo before the targets outrun you.</div>
+  <div class="how"><p><b>Aim</b> by moving or dragging along the top of the board. <b>Release or tap</b> to drop.</p>
+  <p>Each drop scores <b>points × mult × bucket</b>. Beat the round target before you run out of drops.</p>
+  <p>Spend gold in the shop on <b>relics</b> and <b>board upgrades</b>. Every 4th round is a boss with a twist.</p></div>
+  ${legendHTML()}
+  <button class="big" id="startBtn" type="button">Start run</button>
+  ${best.round?`<div class="next">Best: <b>round ${best.round}</b> · best drop <b>${fmtInt(best.drop)}</b></div>`:''}
+  <div class="shoprow">${load('pegmancer.lastRun','')?'<button class="chipbtn" id="lastBtn" type="button">Export last run</button>':''}<div class="spacer"></div>${APPB?'<button class="chipbtn" id="updBtn" type="button">Check for updates</button>':''}<span class="next">${VERSION==='web'?'Web version':'v'+VERSION}</span></div>`);
+  $('startBtn').onclick=()=>{initAudio();newRun()};
+  const lb=$('lastBtn');if(lb)lb.onclick=()=>showExport(load('pegmancer.lastRun',''),showTitle);
+  const ub=$('updBtn');if(ub)ub.onclick=()=>{try{APPB.checkUpdate()}catch(e){}};
+}
+function showShop(lines,total){shopState={lines,total};rerenderShop()}
+function offerHTML(o,i){
+  const isR=o.kind==='relic',it=o.item,price=priceOf(isR?RAR[it.r].p:it.p);
+  const full=isR&&st.relics.length>=MAX_RELICS;
+  const can=!o.sold&&st.gold>=price&&!full;
+  const icon=isR?`<div class="ic" style="border-color:${it.c};color:${it.c}">${it.g}</div>`:`<div class="ic" style="border-color:${COL[it.t]};background:${COL[it.t]}22"><span class="pd" style="background:${COL[it.t]}"></span></div>`;
+  return `<div class="offer ${o.sold?'sold':''}">${icon}<div class="nm">${it.n}</div>
+   ${isR?`<div class="rar" style="color:${RAR[it.r].c}">${RAR[it.r].n}</div>`:''}
+   <div class="ds">${it.d}</div>
+   <button class="buy" data-k="${o.kind}" data-i="${i}" type="button" ${can?'':'disabled'}>${o.sold?'Bought':full?'Relics full':price+' gold'}</button></div>`;
+}
+function rerenderShop(){
+  if(!shopState)return;const {lines,total}=shopState,O=st.offers,nr=st.round+1,nb=nr%4===0;
+  const owned=st.relics.map((r,i)=>`<button class="relic" type="button" data-own="${i}" style="border-color:${r.c};color:${r.c}" title="${r.n}">${r.g}</button>`).join('');
+  const sel=selRelic&&st.relics.includes(selRelic)?`<div id="info"><span><b>${selRelic.n}</b> ${selRelic.d}</span><button class="sellbtn" id="sellSel" type="button">Sell for ${Math.floor(RAR[selRelic.r].p/2)} gold</button></div>`:'';
+  showOv(`<h2>Round ${st.round} cleared</h2>
+   <div class="sum">${lines.map(([a,b])=>`<div><span>${a}</span><span>+${b}</span></div>`).join('')}<div class="tot"><span>Gold now</span><span>${st.gold}</span></div></div>
+   <h3>Relics · ${st.relics.length}/${MAX_RELICS} slots</h3>
+   <div class="offers">${O.rel.map(offerHTML).join('')||'<div class="ds">You own every relic.</div>'}</div>
+   <h3>Board upgrades</h3>
+   <div class="offers two">${O.upg.map(offerHTML).join('')}</div>
+   <div class="shoprow"><button class="chipbtn" id="rerollBtn" type="button" ${st.gold>=rerollCost()?'':'disabled'}>Reroll shop · ${rerollCost()} gold</button><div class="spacer"></div><span style="color:var(--gold);font-weight:800">${st.gold} gold</span></div>
+   ${st.relics.length?`<h3>Your relics (tap to sell)</h3><div class="owned">${owned}</div>${sel}`:''}
+   <div class="next">Next: <b>Round ${nr}</b> · target <b>${fmtInt(target(nr))}</b>${nb?`<br><span class="boss">Boss: ${st.nextBoss.n}. ${st.nextBoss.d}</span>`:''}</div>
+   <button class="big" id="contBtn" type="button">Start round ${nr}</button>
+   <button class="chipbtn" id="shopExp" type="button">Export run summary</button>`);
+  $('shopExp').onclick=()=>{const keep=shopState;showExport(summaryText(),()=>{shopState=keep;rerenderShop()})};
+  ovCard.querySelectorAll('.buy').forEach(bt=>bt.onclick=()=>{const o=(bt.dataset.k==='relic'?O.rel:O.upg)[+bt.dataset.i];buy(o)});
+  ovCard.querySelectorAll('[data-own]').forEach(bt=>bt.onclick=()=>{const r=st.relics[+bt.dataset.own];selRelic=selRelic===r?null:r;rerenderShop()});
+  const sb=$('sellSel');if(sb)sb.onclick=()=>sellRelic(selRelic);
+  $('rerollBtn').onclick=()=>{const c=rerollCost();if(st.gold<c)return;st.gold-=c;st.rerolls++;st.log.shop.push({r:st.round,act:'reroll',price:c});st.offers=rollOffers();blip(500,.1);rerenderShop()};
+  $('contBtn').onclick=()=>{st.round++;selRelic=null;startRound()};
+}
+function gameOver(){
+  st.phase='over';
+  if(st.round-1>best.round){best.round=st.round-1;save('pegmancer.best',best)}
+  st.log.rounds.push({r:st.round,target:st.target,score:st.roundScore,won:false,dropsUsed:st.dropsMax,dropsMax:st.dropsMax,goldEarned:0,goldAfter:st.gold,boss:st.boss?st.boss.n:null});
+  st.log.ended=new Date().toISOString();
+  save('pegmancer.lastRun',summaryText());
+  showOver();
+}
+function showOver(){
+  shopState=null;
+  showOv(`<h2>Out of drops</h2>
+   <div class="sum"><div><span>Reached</span><span>Round ${st.round}</span></div>
+   <div><span>Round score</span><span>${fmtInt(st.roundScore)} / ${fmtInt(st.target)}</span></div>
+   <div><span>Best drop this run</span><span>${fmtInt(st.bestDrop)}</span></div>
+   <div><span>Relics</span><span>${st.relics.length}</span></div>
+   <div class="tot"><span>Best ever</span><span>Round ${best.round} · ${fmtInt(best.drop)}</span></div></div>
+   ${st.relics.length?`<div class="owned" style="justify-content:center">${st.relics.map(r=>`<span class="relic" style="border-color:${r.c};color:${r.c}" title="${r.n}">${r.g}</span>`).join('')}</div>`:''}
+   <button class="big" id="againBtn" type="button">New run</button>
+   <div class="shoprow"><button class="chipbtn" id="expBtn" type="button">Export run summary</button><div class="spacer"></div><button class="chipbtn" id="titleBtn" type="button">Title screen</button></div>`);
+  $('againBtn').onclick=newRun;$('titleBtn').onclick=showTitle;$('expBtn').onclick=()=>showExport(summaryText(),showOver);
+}
+
+// ---------- run summary export ----------
+function summaryText(){
+  if(!st||!st.log)return '';
+  const L=st.log,counts={};st.pegs.forEach(p=>counts[p.type]=(counts[p.type]||0)+1);
+  const ended=st.phase==='over';
+  const out=[];
+  out.push('PEGMANCER RUN SUMMARY');
+  out.push(`Version ${VERSION} · started ${L.started}${L.ended?' · ended '+L.ended:''}`);
+  out.push(ended?`Result: lost on round ${st.round} (${fmtInt(st.roundScore)} / ${fmtInt(st.target)})`:`Status: in progress, round ${st.round} (${fmtInt(st.roundScore)} / ${fmtInt(st.target)}, ${st.dropsLeft} drops left)`);
+  out.push(`Gold ${st.gold} · best drop ${fmtInt(st.bestDrop)} · all-time best round ${best.round}`);
+  out.push(`Relics (${st.relics.length}/${MAX_RELICS}): ${st.relics.map(r=>r.n).join(', ')||'none'}`);
+  out.push(`Board: ${Object.entries(counts).map(([k,v])=>k+' '+v).join(', ')}`);
+  out.push(`Upgrades: blue peg +${st.perm.lvl}, red peg +${st.perm.red}, outer buckets +${st.perm.edge}, extra drops +${st.perm.drops}`);
+  out.push('');out.push('ROUNDS');
+  const rounds=[...new Set(L.drops.map(d=>d.r).concat(L.rounds.map(r=>r.r)))].sort((a,b)=>a-b);
+  for(const r of rounds){
+    const R=L.rounds.find(x=>x.r===r);
+    out.push(R?`Round ${r}${R.boss?' [boss: '+R.boss+']':''}: ${fmtInt(R.score)} / ${fmtInt(R.target)} in ${R.dropsUsed}/${R.dropsMax} drops, ${R.won?'won, +'+R.goldEarned+' gold':'LOST'}`:`Round ${r}: in progress`);
+    L.drops.filter(d=>d.r===r).forEach(d=>out.push(`  drop ${d.d}: ${d.pts} pts × ${d.mult} mult × ${d.bucket} bucket = ${fmtInt(d.score)} (${d.hits} hits)${d.tags.length?' ['+d.tags.join(', ')+']':''}`));
+    L.shop.filter(s=>s.r===r).forEach(s=>out.push(`  shop: ${s.act==='reroll'?'reroll ('+s.price+'g)':s.act+' '+s.name+' ('+s.price+'g)'}`));
+  }
+  out.push('');out.push('DATA (for changes)');
+  out.push(JSON.stringify({v:VERSION,round:st.round,gold:st.gold,relics:st.relics.map(r=>r.id),perm:st.perm,pegs:counts,rounds:L.rounds,drops:L.drops.map(d=>[d.r,d.d,d.pts,d.mult,d.bucket,d.hits,d.score]),shop:L.shop}));
+  return out.join('\n');
+}
+let exportBack=null;
+function showExport(text,back){
+  exportBack=back;shopState=null;
+  showOv(`<h2>Run summary</h2>
+   <div class="tag">Copy or share this and paste it into a chat with Claude to ask for balance changes or new features.</div>
+   <textarea id="expText" readonly style="width:100%;height:46vh;background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:12px;padding:10px;font:12px/1.45 ui-monospace,Consolas,monospace;resize:vertical;-webkit-user-select:text;user-select:text"></textarea>
+   <div class="shoprow"><button class="big" id="copyBtn" type="button">Copy</button>${APPB?'<button class="big" id="shareBtn" type="button">Share</button>':''}<div class="spacer"></div><button class="chipbtn" id="expBack" type="button">Back</button></div>
+   <div class="next" id="copyMsg"></div>`);
+  const ta=$('expText');ta.value=text||'No run yet.';
+  $('copyBtn').onclick=()=>{
+    if(APPB){try{APPB.copy(ta.value);$('copyMsg').textContent='Copied.';return}catch(e){}}
+    const fallback=()=>{ta.focus();ta.select();let ok=false;try{ok=document.execCommand('copy')}catch(e){}$('copyMsg').textContent=ok?'Copied.':'Text selected. Copy it with your device’s copy command.'};
+    if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(ta.value).then(()=>$('copyMsg').textContent='Copied.',fallback);else fallback();
+  };
+  const sh=$('shareBtn');if(sh)sh.onclick=()=>{try{APPB.share(ta.value)}catch(e){}};
+  $('expBack').onclick=()=>{const b=exportBack;exportBack=null;b?b():hideOv()};
+}
+// Android back button: close the export or go back to the title
+window.pegmancerBack=()=>{
+  if(exportBack){const b=exportBack;exportBack=null;b();return true}
+  if(shopState)return true;
+  if(st&&st.log&&(st.phase==='aim'||st.phase==='falling')&&ov.hidden){showExport(summaryText(),hideOv);return true}
+  return false;
+};
+
+// ---------- HUD ----------
+function setLive(h){$('live').innerHTML=h}
+let hudKey='';
+function updateHud(){
+  if(!st)return;
+  const k=[st.round,st.target,st.gold,st.roundScore,st.dropsLeft,st.dropsMax,st.boss&&st.boss.id].join('|');
+  if(k===hudKey)return;hudKey=k;
+  $('hRound').textContent=st.round;$('hTarget').textContent=fmtInt(st.target);$('hGold').textContent=st.gold;
+  $('hScore').textContent=fmtInt(st.roundScore)+' / '+fmtInt(st.target);
+  $('hBar').style.width=Math.min(100,st.roundScore/st.target*100)+'%';
+  let d='<span>Drops</span>';for(let i=0;i<st.dropsMax;i++)d+=`<span class="dot ${i<st.dropsMax-st.dropsLeft?'used':''}"></span>`;
+  $('hDrops').innerHTML=d;
+  $('hBoss').textContent=st.boss?'Boss: '+st.boss.n+'. '+st.boss.d:'';
+}
+function renderRelics(){
+  const el=$('relics');let h='';
+  for(let i=0;i<MAX_RELICS;i++){const r=st&&st.relics[i];
+    h+=r?`<button class="relic" type="button" data-r="${i}" style="border-color:${r.c};color:${r.c}" aria-label="${r.n}">${r.g}</button>`:'<span class="relic empty"></span>'}
+  el.innerHTML=h;
+  el.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{const r=st.relics[+b.dataset.r];selRelic=selRelic===r?null:r;renderInfo()});
+  renderInfo();
+}
+function renderInfo(){
+  const el=$('info');
+  if(selRelic&&st.relics.includes(selRelic)){el.innerHTML=`<span><b>${selRelic.n}</b> ${selRelic.d}</span><button class="sellbtn" id="sellInfo" type="button">Sell ${Math.floor(RAR[selRelic.r].p/2)}g</button>`;$('sellInfo').onclick=()=>sellRelic(selRelic)}
+  else el.innerHTML=st&&st.relics.length?'Tap a relic to see what it does':'Relics you buy show up here';
+}
+
+// ---------- physics ----------
+function collide(b,p,pr,r){
+  const dx=b.x-p.x,dy=b.y-p.y,rr=r+pr,d2=dx*dx+dy*dy;
+  if(d2>=rr*rr||d2===0)return false;
+  const d=Math.sqrt(d2),nx=dx/d,ny=dy/d;
+  b.x=p.x+nx*rr;b.y=p.y+ny*rr;
+  const vn=b.vx*nx+b.vy*ny;
+  if(vn<0){
+    const e=p.type==='bumper'?1.25:.5;
+    b.vx-=(1+e)*vn*nx;b.vy-=(1+e)*vn*ny;
+    b.vx+=(rnd()-.5)*24;
+    if(Math.abs(nx)<.08)b.vx+=(rnd()<.5?-1:1)*40;
+    if(p.type==='bumper'){b.vy-=40}
+  }
+  return true;
+}
+function step(dt){
+  const g=gravity(),r=ballR(),lode=has('lode');
+  for(const b of balls){
+    if(!b.alive)continue;
+    b.t+=dt;b.vy+=g*dt;
+    if(lode)for(const p of st.pegs){if(p.type!=='mult'||p.off)continue;const dx=p.x-b.x,dy=p.y-b.y,d=Math.hypot(dx,dy);if(d<80&&d>1){const a=520*(1-d/80);b.vx+=dx/d*a*dt;b.vy+=dy/d*a*dt*.4}}
+    const sp=Math.hypot(b.vx,b.vy);if(sp>950){b.vx*=950/sp;b.vy*=950/sp}
+    b.x+=b.vx*dt;b.y+=b.vy*dt;
+    if(b.x<r){b.x=r;b.vx=Math.abs(b.vx)*.7;wallHit(b)}
+    if(b.x>W-r){b.x=W-r;b.vx=-Math.abs(b.vx)*.7;wallHit(b)}
+    if(b.y<BT){
+      for(const p of st.pegs){if(p.off)continue;if(collide(b,p,PR,r))hitPeg(p,b)}
+    }
+    for(const p of posts)collide(b,p,4,r);
+    if(b.y>=BT){
+      if(b.bin<0)b.bin=Math.max(0,Math.min(NB-1,Math.floor(b.x/BW)));
+      const lo=b.bin*BW+r,hi=(b.bin+1)*BW-r;
+      if(b.x<lo){b.x=lo;b.vx=Math.abs(b.vx)*.5}if(b.x>hi){b.x=hi;b.vx=-Math.abs(b.vx)*.5}
+    }
+    if(sp<18)b.still+=dt;else b.still=0;
+    if(b.still>1.2){b.vx=(rnd()<.5?-1:1)*140;b.vy=-120;b.still=0}
+    if(b.y>H-r-2||b.t>25)landBall(b);
+  }
+}
+function wallHit(b){if(has('rubber')&&D&&(!b.lastWall||b.t-b.lastWall>.15)){b.lastWall=b.t;D.points+=3;popup(b.x<W/2?18:W-18,b.y,'+3',COL.good,12)}}
+
+// ---------- input ----------
+function boardX(e){const rc=cv.getBoundingClientRect();return (e.clientX-rc.left)/scale}
+cv.addEventListener('pointerdown',e=>{
+  initAudio();if(!st)return;const x=boardX(e);
+  if(st.phase==='aim'){pressing=true;aimX=Math.max(12,Math.min(W-12,x));cv.setPointerCapture&&cv.setPointerCapture(e.pointerId)}
+  else if(st.phase==='falling'&&st.nudges>0){
+    const live=balls.filter(b=>b.alive);if(!live.length)return;
+    const ref=live.reduce((a,b)=>a+b.x,0)/live.length;const dir=x<ref?-1:1;
+    live.forEach(b=>{b.vx+=dir*200;b.vy=Math.min(b.vy,b.vy*.6)});st.nudges--;popup(ref,live[0].y-16,dir<0?'←':'→',COL.splitter,18);blip(600,.06,'sine');
+  }
+});
+cv.addEventListener('pointermove',e=>{if(st&&st.phase==='aim'&&(pressing||e.pointerType==='mouse'))aimX=Math.max(12,Math.min(W-12,boardX(e)))});
+cv.addEventListener('pointerup',e=>{if(pressing&&st&&st.phase==='aim'){pressing=false;tryDrop()}pressing=false});
+cv.addEventListener('pointercancel',()=>pressing=false);
+window.addEventListener('keydown',e=>{if(!st||!ov.hidden)return;if(e.key==='ArrowLeft')aimX=Math.max(12,aimX-10);if(e.key==='ArrowRight')aimX=Math.min(W-12,aimX+10);if(e.key===' '||e.key==='Enter'){e.preventDefault();tryDrop()}});
+
+// ---------- render ----------
+function resize(){
+  const rc=stage.getBoundingClientRect();const s=Math.max(.3,Math.min(rc.width/W,rc.height/H));scale=s;
+  const dpr=Math.min(window.devicePixelRatio||1,3);
+  cv.style.width=W*s+'px';cv.style.height=H*s+'px';cv.width=Math.round(W*s*dpr);cv.height=Math.round(H*s*dpr);
+  ctx.setTransform(s*dpr,0,0,s*dpr,0,0);
+}
+new ResizeObserver(resize).observe(stage);
+function circle(x,y,r){ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2)}
+function draw(t){
+  ctx.save();
+  if(shake>0){ctx.translate((rnd()-.5)*shake,(rnd()-.5)*shake)}
+  const bg=ctx.createLinearGradient(0,0,0,H);bg.addColorStop(0,'#1d1745');bg.addColorStop(1,'#120e28');
+  ctx.fillStyle=bg;ctx.fillRect(-10,-10,W+20,H+20);
+  ctx.strokeStyle='#ffffff08';ctx.lineWidth=1;
+  for(let x=25;x<W;x+=25){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}
+  // drop rail
+  ctx.fillStyle='#2a2354';ctx.fillRect(0,DROP_Y-16,W,32);
+  ctx.fillStyle='#a69dd3';ctx.font='800 10px Nunito, sans-serif';ctx.textAlign='left';ctx.fillText('DROP ZONE',8,DROP_Y-20);
+  if(st&&st.phase==='aim'){
+    ctx.setLineDash([4,6]);ctx.strokeStyle='#ffffff40';ctx.beginPath();ctx.moveTo(aimX,DROP_Y);ctx.lineTo(aimX,120);ctx.stroke();ctx.setLineDash([]);
+    const bob=Math.sin(t/220)*2;ctx.fillStyle='#fff';ctx.shadowColor='#fff';ctx.shadowBlur=12;circle(aimX,DROP_Y+bob,ballR());ctx.fill();ctx.shadowBlur=0;
+    if(has('twin')&&(st.dropNo+1)%3===0){ctx.fillStyle='#2de2c8';ctx.font='800 11px Nunito, sans-serif';ctx.textAlign='center';ctx.fillText('TWIN',aimX,DROP_Y-20)}
+  }
+  // pegs
+  if(st)for(const p of st.pegs){
+    if(p.off){ctx.strokeStyle='#4a3f86';ctx.lineWidth=1.5;circle(p.x,p.y,PR-1);ctx.stroke();ctx.beginPath();ctx.moveTo(p.x-4,p.y-4);ctx.lineTo(p.x+4,p.y+4);ctx.stroke();continue}
+    const c=COL[p.type],dim=(p.type==='bomb'&&p.spent)||((p.type==='splitter'||p.type==='crit')&&p.used);
+    ctx.globalAlpha=dim?.3:1;
+    if(p.type!=='basic'||p.flash>0){ctx.shadowColor=c;ctx.shadowBlur=p.type==='basic'?14*p.flash:8+12*p.flash}
+    ctx.fillStyle=c;circle(p.x,p.y,PR*(1+.35*p.flash));ctx.fill();ctx.shadowBlur=0;
+    ctx.fillStyle='#ffffff70';circle(p.x-2,p.y-2,2.2);ctx.fill();
+    if(p.type==='bumper'){ctx.strokeStyle='#e4cfff';ctx.lineWidth=1.5;circle(p.x,p.y,PR+3);ctx.stroke()}
+    if(p.type==='crit'){ctx.fillStyle='#5b1748';ctx.font='900 8px Nunito, sans-serif';ctx.textAlign='center';ctx.fillText('×',p.x,p.y+3)}
+    ctx.globalAlpha=1;
+    p.flash=Math.max(0,p.flash-.06);
+  }
+  // buckets
+  if(st)for(let i=0;i<NB;i++){
+    const x=i*BW,m=bucketMult(i),f=bucketFlash[i];
+    const hot=m>=4?'#ffc93c':m>=2?'#ff4d6d':m>=1.5?'#b26bff':'#5aa9ff';
+    ctx.fillStyle=hot+(f>0?'aa':'33');ctx.fillRect(x+2,BT,BW-4,H-BT);
+    ctx.fillStyle=f>0?'#fff':hot;ctx.font='22px "Lilita One", sans-serif';ctx.textAlign='center';ctx.fillText('×'+fmt(m),x+BW/2,BT+38);
+    bucketFlash[i]=Math.max(0,f-.03);
+  }
+  ctx.fillStyle='#4a3f86';for(const p of posts){ctx.fillRect(p.x-2,BT,4,H-BT);circle(p.x,p.y,4);ctx.fill()}
+  // balls
+  const r=st?ballR():BASE_R;
+  for(const b of balls){
+    if(!b.alive)continue;
+    b.trail.push(b.x,b.y);if(b.trail.length>16)b.trail.splice(0,2);
+    for(let i=0;i<b.trail.length;i+=2){ctx.fillStyle=`rgba(200,190,255,${i/b.trail.length*.35})`;circle(b.trail[i],b.trail[i+1],r*(i/b.trail.length));ctx.fill()}
+    ctx.fillStyle='#fff';ctx.shadowColor='#fff';ctx.shadowBlur=10;circle(b.x,b.y,r);ctx.fill();ctx.shadowBlur=0;
+  }
+  // popups
+  ctx.textAlign='center';
+  for(const p of pops){
+    const a=1-p.t/1;ctx.globalAlpha=Math.max(0,a);ctx.fillStyle=p.color;
+    ctx.font=(p.size>=20?'':'800 ')+p.size+'px '+(p.size>=20?'"Lilita One", sans-serif':'Nunito, sans-serif');
+    ctx.strokeStyle='#120e28';ctx.lineWidth=p.size>=20?5:3;ctx.strokeText(p.text,p.x,p.y-p.t*28);ctx.fillText(p.text,p.x,p.y-p.t*28);
+  }
+  ctx.globalAlpha=1;ctx.restore();
+}
+let last=performance.now();
+function frame(t){
+  let dt=Math.min(.033,(t-last)/1000);last=t;
+  if(st&&st.phase==='falling'||(st&&balls.some(b=>b.alive))){
+    const n=5;for(let i=0;i<n;i++)step(dt/n);
+    if(st.phase==='falling'&&D){
+      const live=balls.some(b=>b.alive);
+      if(live)setLive(`<span>${fmt(D.points)}</span> <span class="x">× ${fmt(D.mult)}</span> <small>${D.hits} hits${st.nudges?` · ${st.nudges} nudges`:''}</small>`);
+      else{balls=[];finishDrop()}
+    }
+  }
+  pops.forEach(p=>p.t+=dt*.9);pops=pops.filter(p=>p.t<1);
+  shake=Math.max(0,shake-dt*30);
+  draw(t);updateHud();
+  requestAnimationFrame(frame);
+}
+// demo board behind title
+st={round:1,gold:0,relics:[],pegs:buildPegs(),perm:{lvl:0,red:0,edge:0,drops:0},boss:null,nextBoss:BOSSES[0],dropsLeft:5,dropsMax:5,dropNo:0,roundScore:0,target:target(1),phase:'title',bestDrop:0};
+renderRelics();resize();showTitle();requestAnimationFrame(frame);
+})();
+</script>

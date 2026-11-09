@@ -1,0 +1,44 @@
+plugins {
+    id 'com.android.application'
+}
+
+def vc = Integer.parseInt((project.findProperty('versionCode') ?: '1').toString())
+
+android {
+    namespace = 'com.kefirman9000.pegmancer'
+    compileSdk = 36
+
+    defaultConfig {
+        applicationId = 'com.kefirman9000.pegmancer'
+        minSdk = 30
+        targetSdk = 36
+        versionCode = vc
+        versionName = "1.${vc}"
+    }
+
+    signingConfigs {
+        release {
+            storeFile = file('release.keystore')
+            storePassword = 'pegmancer'
+            keyAlias = 'pegmancer'
+            keyPassword = 'pegmancer'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled = false
+            signingConfig = signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
+    }
+}
