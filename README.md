@@ -37,3 +37,7 @@ If you find this useful, you can support my work through [GitHub Sponsors](https
 - **Overkill pay**: beating quota by 2×, 4×, 8×… pays extra coins.
 - **Interns**: earn stars from runs and unlock starting variants (Glass, Gambling, Hoarding, Pyromaniac, On Probation).
 - **Board scramble**, **daily seeded run**, and a final boss at round 60.
+- **Relic evolutions**: hold two matching relics at ×3 and they fuse into an evolved relic at the start of the next round (e.g. Ember + Snowball's Chance → Inferno Snowball). Seven recipes.
+- **Jackpots**: landing in a ×4 bucket rains coins, with a small chance of a free relic.
+- **Relic Book**: every relic you've seen, owned and won with, plus your records.
+- **Save and resume**: a run is saved after every launch; Continue picks it up from the title screen.
