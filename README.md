@@ -4,7 +4,7 @@ A darkly comic plinko roguelike. You are a devil intern launching damned souls d
 
 ## Features
 
-- **Pinball plunger launch**: pull down anywhere and release. The soul shoots up the side lane and over the top, and a harder pull sends it further. Hold a full pull to ignite a Hellfire soul.
+- **Soul cannon**: drag anywhere to aim the cannon at the top center. A dotted line shows the path to the first peg. Release to fire. Hold still to charge one Hellfire soul per round.
 - **Torment pegs** worth powers of 2. Each hit scores the value, then halves it. At 0 the peg pops. Purge the board for ×2.
 - **Consignments**: every time your round total passes quota again, empty slots refill and matching neighbours merge. Each one pays a coin.
 - **Suffering × mult × bucket** scoring, with sigil pegs for mult, coins, bounce, splits, crits and blasts.

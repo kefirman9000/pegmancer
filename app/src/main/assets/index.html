@@ -138,8 +138,8 @@ h3{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute
     <div class="row"><div id="hDrops"></div><span id="hZone"></span><div class="spacer"></div><div id="hMod"></div></div>
   </header>
   <div id="itemBar" aria-label="Your items"></div>
-  <div id="stage"><canvas id="cv" aria-label="Board of Torment. Pull the plunger down and release to launch a soul up the lane."></canvas></div>
-  <div id="liveRow"><div id="live">Pull down anywhere, release to launch</div><button id="bankBtn" type="button" hidden>End round</button></div>
+  <div id="stage"><canvas id="cv" aria-label="Board of Torment. Drag to aim the soul cannon, release to fire. Hold still to charge a Hellfire shot."></canvas></div>
+  <div id="liveRow"><div id="live">Drag to aim, release to fire</div><button id="bankBtn" type="button" hidden>End round</button></div>
   <div id="tray"></div>
   <div id="info"></div>
 </div>
@@ -147,7 +147,7 @@ h3{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute
 
 <script>
 (()=>{
-const W=400,H=660,PW=362,LX=381,LANE_TOP=98,HEAD_Y=626,ARC_R=13.5,ARC_CX=367.5,ARC_Y=80,DROP_Y=62,BT=598,NB=7,BW=PW/NB,BASE_R=7,FINAL=60,LAUNCH=320,MAX_ANG=1.05;
+const W=400,H=660,PW=400,CX=200,CY=36,BARREL=30,SHOT=430,MAX_AIM=1.35,LX=381,LANE_TOP=98,HEAD_Y=626,ARC_R=13.5,ARC_CX=367.5,ARC_Y=80,DROP_Y=62,BT=598,NB=7,BW=PW/NB,BASE_R=7,FINAL=60,LAUNCH=320,MAX_ANG=1.05;
 const SPECIAL={mult:'#9cff57',gold:'#ffd54a',bumper:'#b26bff',splitter:'#5ce1ff',crit:'#ff4fd8',bomb:'#ff6a00'};
 const SPECIAL_GLYPH={mult:'×',gold:'$',bumper:'',splitter:'Y',crit:'!',bomb:'*'};
 const PEGINFO=[['num','Torment pegs: give their value in suffering, then halve. Pop at 0'],['mult','Wrath sigil: +1 mult'],['gold','Coin sigil: +1 soul coin'],['bumper','Rubber sigil: big bounce'],['splitter','Split sigil: splits the soul'],['crit','Agony sigil: doubles mult'],['bomb','Sulfur sigil: blast, once a round']];
@@ -190,7 +190,7 @@ const ITEMS=[
  {id:'coupon',n:'Employee Discount',g:'%',r:1,trig:'passive',d:()=>'Commissary and canteen prices are 20% lower'},
  {id:'hopper',n:'Extra Chute',g:'+1',r:2,trig:'passive',d:()=>'+1 drop every round'},
  {id:'clover',n:'Cursed Clover',g:'4L',r:1,trig:'hit',d:L=>`${8*L}% chance the hit scores double`,fn:(L,c)=>{if(rnd()<.08*L)c.dbl=true}},
- {id:'ghost',n:'Doppelgänger',g:'GB',r:2,trig:'start',d:L=>`${20*L}% chance to launch a second soul`,fn:L=>{if(rnd()<.2*L)spawn(exitX(),ARC_Y-ARC_R,-(150+rnd()*500),-80)}},
+ {id:'ghost',n:'Doppelgänger',g:'GB',r:2,trig:'start',d:L=>`${20*L}% chance to launch a second soul`,fn:L=>{if(rnd()<.2*L){const a=aimAng+(rnd()-.5)*.6,m=muzzle(a);spawn(m.x,m.y,Math.sin(a)*SHOT,Math.cos(a)*SHOT)}}},
  {id:'compass',n:'Lost Compass',g:'Cm',r:2,trig:'land',d:L=>`Landing in an outer bucket: ×${1+L*.5} mult`,fn:(L,c)=>{if(c.bucket===0||c.bucket===6)D.mult*=1+L*.5}},
  {id:'battery',n:'Lightning Rod',g:'Bt',r:1,trig:'wallN',every:3,d:L=>`+${2*L} mult`,fn:L=>addMult(2*L)},
  {id:'metronome',n:'Drumbeat of Doom',g:'Mt',r:1,trig:'hitN',every:5,d:L=>`+${6*L} points`,fn:L=>addPts(6*L)},
@@ -277,8 +277,9 @@ function save(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 let st=null,D=null,balls=[],pops=[],aimX=W/2,aimAng=0,dragging=false,sel=null,shake=0,depth=0,chargeStart=0,anchor=null;
-let pull=0,pullY=0,maxSince=0,kbPull=false;
-const chargeNow=()=>dragging&&maxSince?Math.min(1,(performance.now()-maxSince)/700):0;
+let pull=0,pullY=0,maxSince=0,kbPull=false,recoil=0;
+const chargeNow=()=>dragging&&!st.hellUsed&&chargeStart?Math.min(1,Math.max(0,(performance.now()-chargeStart-250)/1000)):0;
+const muzzle=a=>({x:CX+Math.sin(a)*BARREL,y:CY+Math.cos(a)*BARREL});
 const exitX=()=>PW-ballR()-1;
 const restY=()=>HEAD_Y-ballR();
 function pathLen(){return (restY()-ARC_Y)+Math.PI/2*ARC_R+(ARC_CX-exitX())}
@@ -436,8 +437,8 @@ function startRound(){
   st.dropsMax=Math.max(1,5+(has('hopper')?1:0)+(has('clock')?2:0)-(st.mod&&st.mod.id==='short'?1:0));
   st.dropsLeft=st.dropsMax;st.dropNo=0;st.roundScore=0;st.quipLevel=0;st.restocksRound=0;st.quotaHit=false;st.roundBonus=0;
   D={points:0,mult:1};fire('round',{});D=null;
-  st.tgt=target();st.phase='aim';balls=[];st.launchAnim=null;pull=0;dragging=false;
-  setLive('Pull down anywhere, release to launch');hideOv();renderTray();renderBar();
+  st.tgt=target();st.phase='aim';balls=[];st.launchAnim=null;pull=0;dragging=false;st.hellUsed=false;
+  setLive('Drag to aim, release to fire');hideOv();renderTray();renderBar();
 }
 function gravity(){let g=950;if(has('kite'))g*=.8;if(st.mod&&(st.mod.id==='heavy'||st.mod.id==='foreman'))g*=1.4;return g}
 function ballR(){return st&&has('core')?BASE_R*1.35:BASE_R}
@@ -449,8 +450,10 @@ function tryDrop(pw=.5,ch=0){
   st.pegs.forEach(p=>p.used=false);
   if(st.mod&&st.mod.id==='gardener')shuffle(numPegs()).slice(0,6).forEach(p=>{p.kind=null;p.v=0});
   if(st.mod&&st.mod.id==='astronomer')st.bucketOrder=shuffle([0,1,2,3,4,5,6]);
-  st.launchAnim={d:0,pow:pw,hell:ch>=1,speed:1100+2400*pw};
-  D.charge=ch;D.power=pw;
+  const m=muzzle(aimAng);spawn(m.x,m.y,Math.sin(aimAng)*SHOT,Math.cos(aimAng)*SHOT);
+  if(ch>=1){st.hellUsed=true;balls[balls.length-1].fire=5;popup(m.x,m.y+40,'HELLFIRE SOUL','#ff6a00',22);shake=8;flash('#ff6a00',.3);burst(m.x,m.y,'#ff6a00',30,260,3)}
+  else burst(m.x,m.y,'#ffb02e',10,160,2.5);
+  recoil=1;D.charge=ch;D.power=Math.round(-aimAng*57.3);
   fire('start',{});
   if(hasPerk('ignition'))forceTrigger(1,1);
   if(hasPerk('early')&&st.dropNo===1)forceTrigger('first',3);
@@ -533,7 +536,7 @@ function finishDrop(){
   if(D.espresso){s*=3;tags.push('Espresso ×3')}
   if(has('abyss'))st.pegs.forEach(p=>{if(p.kind==='num'){p.v=Math.floor(p.v/2);if(p.v<=0){p.kind=null;p.v=0}}});
   s=Math.floor(s);
-  st.log.drops.push({r:st.round,d:st.dropNo,pts:+D.points.toFixed(1),mult:+D.mult.toFixed(2),bucket:+D.bucket.toFixed(2),hits:D.hits,pops:D.pops,score:s,pow:Math.round((D.power||0)*100),hell:D.charge>=1,tags});
+  st.log.drops.push({r:st.round,d:st.dropNo,pts:+D.points.toFixed(1),mult:+D.mult.toFixed(2),bucket:+D.bucket.toFixed(2),hits:D.hits,pops:D.pops,score:s,pow:D.power||0,hell:D.charge>=1,tags});
   st.roundScore+=s;st.dropsLeft--;st.bestDrop=Math.max(st.bestDrop,s);
   if(s>best.drop){best.drop=s;save('pegmancer.best2',best)}
   tally={pts:D.points,mult:D.mult,bucket:Math.max(D.bucket,.5),total:s,t:0,stamped:false,tick:0};
@@ -597,7 +600,7 @@ function legendHTML(){return '<div class="legend">'+PEGINFO.map(([t,l])=>`<div><
 function showTitle(){
   showOv(`<div class="logo">PEG<br>MANCER</div>
   <div class="tag">You are a lowly devil intern. Launch damned souls down the Boards of Torment and make quota, or the Infernal Auditor will unmake you.</div>
-  <div class="how"><p><b>Launch:</b> pull down anywhere on the board to draw back the plunger, then release. The soul shoots up the lane on the right and over the top. A harder pull sends it further left. <b>Hold a full pull</b> until it glows to launch a Hellfire soul that burns the first 5 pegs it hits.</p>
+  <div class="how"><p><b>Launch:</b> drag anywhere to aim the soul cannon at the top. The dotted line shows the path to the first peg. Release to fire. <b>Hold still</b> until the cannon glows to fire a Hellfire soul that burns the first 5 pegs it hits (once per round).</p>
   <p>Each launch scores <b>suffering × mult × bucket</b>. A torment peg gives its value, then halves. At 0 it pops.</p>
   <p>Every time your round total passes quota again, a <b>fresh consignment of the damned</b> arrives: empty slots refill, matching neighbours fuse into greater sinners, and you get a soul coin.</p>
   <p>Relics in the bar above the board fire on their trigger, left to right. Order matters. Miss quota and you lose a chance. Survive ${FINAL} rounds to make Pegmancer.</p></div>
@@ -792,7 +795,7 @@ function summaryText(){
   for(const r of rounds){
     const R=L.rounds.find(x=>x.r===r);
     o.push(R?`Round ${r}${R.mod?' ['+R.mod+']':''}: ${fmtInt(R.score)} / ${fmtInt(R.target)} in ${R.dropsUsed}/${R.dropsMax} drops, ${R.won?'won':'MISSED'}, ${R.restocks} restocks, coins after ${R.coinsAfter}, lives ${R.lives}`:`Round ${r}: in progress`);
-    L.drops.filter(d=>d.r===r).forEach(d=>o.push(`  drop ${d.d}: ${fmt(d.pts)} pts × ${fmt(d.mult)} mult × ${fmt(d.bucket)} = ${fmtInt(d.score)} (${d.hits} hits, ${d.pops} pops, plunger ${d.pow}%${d.hell?', HELLFIRE':''})${d.tags.length?' ['+d.tags.join(', ')+']':''}`));
+    L.drops.filter(d=>d.r===r).forEach(d=>o.push(`  drop ${d.d}: ${fmt(d.pts)} pts × ${fmt(d.mult)} mult × ${fmt(d.bucket)} = ${fmtInt(d.score)} (${d.hits} hits, ${d.pops} pops, aim ${d.pow}°${d.hell?', HELLFIRE':''})${d.tags.length?' ['+d.tags.join(', ')+']':''}`));
     L.events.filter(e=>e.r===r).forEach(e=>o.push('  · '+e.e));
   }
   o.push('');o.push('DATA (for changes)');
@@ -933,25 +936,19 @@ function wallHit(b){
   if(hasPerk('rebound'))forceTrigger('last',1,c);
 }
 
-// ---------- input: pull the plunger down anywhere, release to launch ----------
+// ---------- input: drag to aim the cannon, release to fire, hold still to charge ----------
 function boardPt(e){const rc=cv.getBoundingClientRect();return {x:(e.clientX-rc.left)/scale,y:(e.clientY-rc.top)/scale}}
-function setPull(v){pull=Math.max(0,Math.min(1,v));if(pull>=.98){if(!maxSince)maxSince=performance.now()}else maxSince=0}
-function release(){
-  if(!dragging)return;const ch=chargeNow(),pw=pull;dragging=false;kbPull=false;pull=0;maxSince=0;
-  if(!st||st.phase!=='aim')return;
-  if(pw<.04){setLive('Pull further down, then release');return}
-  tryDrop(pw,ch);
-}
+function aimAt(pt){const dx=pt.x-CX,dy=Math.max(8,pt.y-CY);aimAng=Math.max(-MAX_AIM,Math.min(MAX_AIM,Math.atan2(dx,dy)))}
 cv.addEventListener('pointerdown',e=>{
   initAudio();if(!st||!st.log||st.phase!=='aim')return;
-  dragging=true;pullY=boardPt(e).y;setPull(0);cv.setPointerCapture&&cv.setPointerCapture(e.pointerId);
+  dragging=true;const pt=boardPt(e);aimAt(pt);anchor=pt;chargeStart=performance.now();cv.setPointerCapture&&cv.setPointerCapture(e.pointerId);
 });
-cv.addEventListener('pointermove',e=>{if(st&&st.phase==='aim'&&dragging&&!kbPull){const y=boardPt(e).y;setPull((y-pullY)/170)}});
-cv.addEventListener('pointerup',release);
-cv.addEventListener('pointercancel',()=>{dragging=false;pull=0;maxSince=0});
+cv.addEventListener('pointermove',e=>{if(st&&st.phase==='aim'&&dragging){const pt=boardPt(e);aimAt(pt);if(!anchor||Math.hypot(pt.x-anchor.x,pt.y-anchor.y)>4){anchor=pt;chargeStart=performance.now()}}});
+cv.addEventListener('pointerup',()=>{if(dragging&&st&&st.phase==='aim'){const ch=chargeNow();dragging=false;tryDrop(1,ch)}dragging=false});
+cv.addEventListener('pointercancel',()=>dragging=false);
 window.addEventListener('keydown',e=>{if(!st||!st.log||!ov.hidden||st.phase!=='aim')return;
-  if((e.key===' '||e.key==='Enter'||e.key==='ArrowDown')&&!kbPull){e.preventDefault();kbPull=true;dragging=true;setPull(0)}});
-window.addEventListener('keyup',e=>{if(kbPull&&(e.key===' '||e.key==='Enter'||e.key==='ArrowDown')){e.preventDefault();release()}});
+  if(e.key==='ArrowLeft'){aimAng=Math.min(MAX_AIM,aimAng+.04)}if(e.key==='ArrowRight'){aimAng=Math.max(-MAX_AIM,aimAng-.04)}
+  if(e.key===' '||e.key==='Enter'){e.preventDefault();tryDrop(1,0)}});
 
 // ---------- render ----------
 function resize(){
@@ -981,36 +978,38 @@ function draw(t){
   ctx.fillStyle='#ffffff0d';ctx.fillRect(0,DROP_Y-18,W,36);
   if(st&&st.phase==='falling'&&D){
     ctx.textAlign='left';ctx.fillStyle='#c59a87';ctx.font='800 9px Nunito, sans-serif';ctx.fillText('SUFFERING',12,DROP_Y-22);
-    ctx.textAlign='right';ctx.fillText('MULT',PW-12,DROP_Y-22);ctx.textAlign='center';ctx.fillText(D.hits+' HITS · '+D.pops+' POPS',PW/2,DROP_Y-22);
+    ctx.textAlign='right';ctx.fillText('MULT',PW-12,DROP_Y-22);ctx.textAlign='left';ctx.fillText(D.hits+' HITS · '+D.pops+' POPS',CX+34,DROP_Y-22);
     ctx.font=Math.round(28*(1+.4*liveBump.p))+'px "Lilita One", sans-serif';ctx.textAlign='left';ctx.fillStyle='#ffb02e';ctx.shadowColor='#ff6a00';ctx.shadowBlur=10*liveBump.p;
     ctx.fillText(fmt(D.points),12,DROP_Y+12);
     ctx.font=Math.round(28*(1+.4*liveBump.m))+'px "Lilita One", sans-serif';ctx.textAlign='right';ctx.fillStyle='#9cff57';ctx.shadowColor='#9cff57';ctx.shadowBlur=10*liveBump.m;
     ctx.fillText('×'+fmt(D.mult),PW-12,DROP_Y+12);ctx.shadowBlur=0;
     {const prod=D.points*D.mult,ratio=(st.roundScore+prod)/st.tgt,sz=Math.min(34,20+Math.log10(prod+1)*3.5)*(1+.25*Math.max(liveBump.p,liveBump.m));
      ctx.textAlign='center';ctx.font=Math.round(sz)+'px "Lilita One", sans-serif';ctx.fillStyle=ratio>=1?'#9cff57':ratio>=.5?'#ffb02e':'#fbe9dc';ctx.shadowColor=ctx.fillStyle;ctx.shadowBlur=ratio>=1?14:0;
-     ctx.fillText('= '+fmt(prod),PW/2,DROP_Y+12);ctx.shadowBlur=0}
-  }else{ctx.fillStyle='#c59a87';ctx.font='800 9px Nunito, sans-serif';ctx.textAlign='left';ctx.fillText('PULL DOWN ANYWHERE, RELEASE TO LAUNCH',8,DROP_Y-22)}
-  if(st&&st.phase==='aim'&&st.log&&dragging&&pull>.02){
-    // landing preview from the top of the lane
-    const v=launchV(pull),g=gravity(),r0=ballR();let x=exitX(),y=ARC_Y-ARC_R,vx=v.vx,vy=v.vy;
-    ctx.fillStyle=chargeNow()>=1?'#ff6a00aa':'#ffffff66';
-    for(let i=1;i<=22;i++){const dt=.03;vy+=g*dt;x+=vx*dt;y+=vy*dt;if(x<r0){x=2*r0-x;vx=-vx*.7}if(y>BT)break;if(i%2===0){circle(x,y,2.4-i*.05);ctx.fill()}}
-    ctx.textAlign='center';ctx.font='18px "Lilita One", sans-serif';ctx.fillStyle=chargeNow()>=1?'#ff6a00':'#ffb02e';
-    ctx.fillText(chargeNow()>=1?'HELLFIRE READY':'POWER '+Math.round(pull*100)+'%',PW/2,DROP_Y+8);
-  }
-  // launch lane and plunger
-  ctx.fillStyle='#0e0403';ctx.fillRect(PW,LANE_TOP-20,W-PW,H-LANE_TOP+20);
-  ctx.strokeStyle='#5a2318';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(PW,LANE_TOP);ctx.lineTo(PW,H);ctx.stroke();
-  ctx.beginPath();ctx.arc(ARC_CX,ARC_Y,ARC_R+ballR()+2,-Math.PI/2,0);ctx.lineTo(W-1,H);ctx.stroke();
+     ctx.fillText('= '+fmt(prod),CX,DROP_Y+46);ctx.shadowBlur=0}
+  }else{ctx.fillStyle='#c59a87';ctx.font='800 9px Nunito, sans-serif';ctx.textAlign='left';ctx.fillText('DRAG TO AIM · RELEASE TO FIRE',8,DROP_Y-22);if(st&&st.log&&st.phase==='aim'){ctx.textAlign='right';ctx.fillStyle=st.hellUsed?'#5a2318':'#ff6a00';ctx.fillText(st.hellUsed?'HELLFIRE USED':'HOLD STILL: HELLFIRE',W-8,DROP_Y-22)}}
   if(st&&st.log){
-    const pl=st.phase==='aim'?pull:0,head=HEAD_Y+pl*28,hot=chargeNow()>=1;
-    ctx.strokeStyle=hot?'#ff6a00':'#c59a87';ctx.lineWidth=2;ctx.beginPath();
-    const coils=7,top=head+6,bot=H-3;for(let i=0;i<=coils*2;i++){const yy=top+(bot-top)*i/(coils*2);ctx.lineTo(LX+(i%2?8:-8),yy)}ctx.stroke();
-    ctx.fillStyle=hot?'#ff6a00':'#ffb02e';ctx.fillRect(LX-12,head,24,6);
-    if(hot){ctx.shadowColor='#ff6a00';ctx.shadowBlur=16;ctx.fillRect(LX-12,head,24,6);ctx.shadowBlur=0}
-    if(st.phase==='aim')drawSoul(LX,head-ballR(),ballR(),hot,0,t);
-    if(st.launchAnim){const q=pathPos(st.launchAnim.d);drawSoul(q.x,q.y,ballR(),st.launchAnim.hell,999,t)}
-    if(st.phase==='aim'&&!dragging){ctx.fillStyle='#c59a87';ctx.font='800 9px Nunito, sans-serif';ctx.textAlign='center';ctx.save();ctx.translate(LX,LANE_TOP+60);ctx.rotate(-Math.PI/2);ctx.fillText('▼ PULL',0,3);ctx.restore()}
+    const hotC=chargeNow(),hot=hotC>=1;
+    if(st.phase==='aim'){
+      // aim preview: path until the first peg
+      const r0=ballR(),g=gravity(),m=muzzle(aimAng);let x=m.x,y=m.y,vx=Math.sin(aimAng)*SHOT,vy=Math.cos(aimAng)*SHOT,hit=null;
+      ctx.fillStyle=hot?'#ff6a00cc':'#ffffff70';
+      for(let i=1;i<=60&&!hit;i++){const dt=.012;vy+=g*dt;x+=vx*dt;y+=vy*dt;if(x<r0){x=2*r0-x;vx=-vx}if(x>W-r0){x=2*(W-r0)-x;vx=-vx}if(y>BT)break;
+        for(const p of st.pegs){if(p.kind&&!p.off&&Math.hypot(p.x-x,p.y-y)<pegR(p)+r0){hit=p;break}}
+        if(i%3===0){circle(x,y,2.3);ctx.fill()}}
+      if(hit){ctx.strokeStyle=hot?'#ff6a00':'#fbe9dc';ctx.lineWidth=2;circle(hit.x,hit.y,pegR(hit)+5);ctx.stroke()}
+    }
+    // the soul cannon
+    const a=aimAng,kick=recoil*6;
+    ctx.save();ctx.translate(CX,CY);ctx.rotate(-a);
+    ctx.fillStyle=hot?'#ff6a00':'#5a2318';if(hot){ctx.shadowColor='#ff6a00';ctx.shadowBlur=18}
+    ctx.beginPath();ctx.moveTo(-9,-kick);ctx.lineTo(9,-kick);ctx.lineTo(7,BARREL-kick);ctx.lineTo(-7,BARREL-kick);ctx.closePath();ctx.fill();ctx.shadowBlur=0;
+    ctx.fillStyle='#ffb02e';ctx.fillRect(-8,BARREL-kick-4,16,4);
+    if(hotC>0&&!hot){ctx.fillStyle='#ff6a00';ctx.fillRect(-7,BARREL-kick-4-(BARREL-6)*hotC,14,(BARREL-6)*hotC)}
+    ctx.restore();
+    ctx.fillStyle='#3a1612';ctx.strokeStyle='#ff6a00';ctx.lineWidth=2;ctx.beginPath();ctx.arc(CX,CY,16,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#ffb02e';circle(CX,CY,4);ctx.fill();
+    if(st.phase==='aim'){const m=muzzle(a);drawSoul(m.x,m.y,ballR(),hot,0,t);
+      if(hot){ctx.fillStyle='#ff6a00';ctx.font='16px "Lilita One", sans-serif';ctx.textAlign='center';ctx.fillText('HELLFIRE READY',CX,CY-14)}}
   }
   // pegs
   if(st&&st.pegs)for(const p of st.pegs){
@@ -1114,7 +1113,7 @@ function frame(t){
     if(!T.stamped&&T.t<.8){T.tick+=dt;if(T.tick>.06){T.tick=0;lastBlip=0;blip(300+T.t*900,.04,'square',.025)}}
     if(!T.stamped&&T.t>=.8){T.stamped=true;const m=Math.log10(T.total+1);shake=Math.min(16,3+m*2.2);burst(W/2,H/2-10,'#ffb02e',Math.min(70,15+m*10),200+m*60,3.2);if(m>3)flash('#ffb02e',Math.min(.4,.08*m));chord(m>4?[523,659,784,1046]:[523,784])}
     if(T.t>1.9)tally=null}
-  flashA=Math.max(0,flashA-dt*1.8);
+  flashA=Math.max(0,flashA-dt*1.8);recoil=Math.max(0,recoil-dt*5);
   shake=Math.max(0,shake-dt*30);
   draw(t);updateHud();tickBar(t);
   requestAnimationFrame(frame);
