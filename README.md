@@ -4,7 +4,7 @@ A darkly comic plinko roguelike. You are a junior demon launching damned souls d
 
 ## Features
 
-- **Soul cannon**: on PC the cannon follows the mouse; click to fire. On phones, drag on the board to aim, then tap **Launch**. A dotted line shows the path to the first peg. Hold the click or the Launch button to charge one Hellfire soul per round.
+- **Soul cannon**: on PC the cannon follows the mouse; click to fire. On phones, swipe sideways on the board to swing the cannon (faster swipes turn it further; aim speed is adjustable on the title screen), then tap **Launch**. A dotted line shows the path to the first peg. Hold the click or the Launch button to charge one Hellfire soul per round.
 - **Torment pegs** worth powers of 2. Each hit scores the value, then halves it. At 0 the peg pops. Purge the board for ×2.
 - **Consignments**: every time your round total passes quota again, empty slots refill and matching neighbours merge. Each one pays a coin.
 - **Suffering × mult × bucket** scoring, with sigil pegs for mult, coins, bounce, splits, crits and blasts.
