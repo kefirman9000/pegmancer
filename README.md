@@ -1,6 +1,6 @@
 # Pegmancer
 
-A darkly comic plinko roguelike. You are a devil intern launching damned souls down the Boards of Torment. Torment pegs give their value in suffering, then halve and pop. Overshoot quota and fresh consignments of the damned arrive, fusing into greater sinners. Build absurd combos from triggered relics before the Infernal Auditor unmakes you.
+A darkly comic plinko roguelike. You are a junior demon launching damned souls down the Boards of Torment. Torment pegs give their value in suffering, then halve and pop. Overshoot quota and fresh consignments of the damned arrive, fusing into greater sinners. Build absurd combos from triggered relics before the Infernal Auditor unmakes you.
 
 ## Features
 
@@ -31,13 +31,17 @@ If you find this useful, you can support my work through [GitHub Sponsors](https
 
 ### More chaos
 - **Multi-peg relics**: Chain Lightning arcs to nearby pegs, Kindred Torment hits every peg sharing a value, Twin Strike and Bone Shrapnel hit neighbours.
-- **Timer relics**: Tormentor's Kazoo and Screaming Gargoyle fire on a clock while a soul falls; Oath of Chaos triggers a random relic every second.
+- **Timer relics**: Bugle of Torment and Screaming Gargoyle fire on a clock while a soul falls; Oath of Chaos triggers a random relic every second.
 - **Peg copying**: Usurper's Crown and Mimic Chest copy big values onto small pegs.
-- **Gambling snacks**: Devil's Wager (double or nothing), Chaos Stew (reroll all relics), Sacrificial Tart (upgrade right, destroy left).
+- **Gambling snacks**: Devil's Wager (double or nothing), Chaos Stew (reroll all relics), Sacrificial Offering (upgrade right, destroy left).
 - **Overkill pay**: beating quota by 2×, 4×, 8×… pays extra coins.
-- **Interns**: earn stars from runs and unlock starting variants (Glass, Gambling, Hoarding, Pyromaniac, On Probation).
+- **Contracts**: earn hellmarks from runs and unlock starting contracts (Glass, Gambler's, Hoarder's, Arsonist's, Probation).
 - **Board scramble**, **daily seeded run**, and a final boss at round 60.
 - **Relic evolutions**: hold two matching relics at ×3 and they fuse into an evolved relic at the start of the next round (e.g. Ember + Snowball's Chance → Inferno Snowball). Seven recipes.
 - **Jackpots**: landing in a ×4 bucket rains coins, with a small chance of a free relic.
 - **Relic Book**: every relic you've seen, owned and won with, plus your records.
 - **Save and resume**: a run is saved after every launch; Continue picks it up from the title screen.
+- **Peg tiers**: every power of 2 has its own colour and shape; 1-pegs are ghosts the soul passes straight through.
+- **More sigils**: Chain (hits the 3 nearest pegs), Gluttony (doubles 2 neighbours), Warp (sends the soul back to the top).
+- **Summons**: Brimstone Meteor, Imp Swarm and Judgment Hammer drop things onto the board.
+- Meeting quota restores a chance; the Hiring Freeze audit disables your two leftmost relics.
