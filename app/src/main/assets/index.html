@@ -3,10 +3,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@500;700;800&display=swap">
 <style>
-/* Layout: one-screen arcade cabinet — HUD strip, board canvas filling the middle, relic tray below; overlays for title/shop/game over */
+/* Theme: darkly comic infernal bureaucracy — hellfire oranges, scorched blacks, sickly green. Layout: one-screen cabinet — HUD, item bar on top of the board, board canvas, live score + food/perk tray; overlays for title, market, cafe, claw, perks, game over */
 :root{
-  --bg:#130f26; --panel:#1f1940; --panel2:#2a2354; --line:#3b3272;
-  --fg:#f3efff; --muted:#a69dd3; --gold:#ffc93c; --red:#ff4d6d; --blue:#5aa9ff; --teal:#2de2c8; --good:#5fdc6a;
+  --bg:#140806; --panel:#261010; --panel2:#3a1612; --line:#5a2318;
+  --fg:#fbe9dc; --muted:#c59a87; --gold:#ffb02e; --red:#ff3b2f; --blue:#ff7a2e; --teal:#9cff57; --good:#9cff57; --cursed:#c86bff;
   --display:'Lilita One', 'Arial Rounded MT Bold', 'Trebuchet MS', sans-serif;
   --body:'Nunito', 'Segoe UI', system-ui, sans-serif;
   color-scheme:dark;
@@ -14,347 +14,571 @@
 *{box-sizing:border-box}
 html,body{height:100%}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);overflow:hidden;touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+[hidden],.overlay[hidden]{display:none!important}
 button{font:inherit;color:inherit;cursor:pointer}
 button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
-#app{height:100%;display:flex;flex-direction:column;max-width:560px;margin:0 auto;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:8px;gap:6px}
-#hud{display:flex;flex-direction:column;gap:6px}
-.row{display:flex;align-items:center;gap:8px}
+button:disabled{cursor:default}
+#app{height:100%;display:flex;flex-direction:column;max-width:560px;margin:0 auto;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:6px;gap:5px}
+#hud{display:flex;flex-direction:column;gap:5px}
+#hud .row:first-child{gap:14px}
+.row{display:flex;align-items:center;gap:8px;min-width:0}
 .stat{display:flex;flex-direction:column;line-height:1.05;min-width:0}
-.stat span{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:800}
-.stat b{font-family:var(--display);font-weight:400;font-size:22px;font-variant-numeric:tabular-nums}
+.stat span{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:800;white-space:nowrap}
+.stat b{font-family:var(--display);font-weight:400;font-size:20px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .stat.gold b{color:var(--gold)}
+.stat.life b{color:var(--red);letter-spacing:1px}
 .spacer{flex:1}
-.chipbtn{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:12px;font-weight:800;color:var(--muted)}
-.bar{position:relative;height:22px;border-radius:11px;background:var(--panel);border:1px solid var(--line);overflow:hidden}
-#hBar{position:absolute;inset:0 auto 0 0;width:0;background:linear-gradient(90deg,#6b4dff,#ff4d6d);transition:width .35s ease}
-#hScore{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;font-variant-numeric:tabular-nums;text-shadow:0 1px 2px #0008}
-#hDrops{display:flex;gap:5px;align-items:center;font-size:12px;color:var(--muted);font-weight:800}
-.dot{width:12px;height:12px;border-radius:50%;background:var(--fg);box-shadow:0 0 6px #fff8}
+.chipbtn{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:12px;font-weight:800;color:var(--muted);white-space:nowrap}
+.chipbtn:disabled{opacity:.45}
+.bar{position:relative;height:20px;border-radius:10px;background:var(--panel);border:1px solid var(--line);overflow:hidden}
+#hBar{position:absolute;inset:0 auto 0 0;width:0;background:linear-gradient(90deg,#8a1a10,#ff3b2f);transition:width .35s ease}
+#hBar.over{background:linear-gradient(90deg,#ffb02e,#9cff57)}
+#hScore{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12.5px;font-variant-numeric:tabular-nums;text-shadow:0 1px 2px #0008}
+#hDrops{display:flex;gap:4px;align-items:center;font-size:12px;color:var(--muted);font-weight:800;flex:none}
+.dot{width:11px;height:11px;border-radius:50%;background:var(--fg);box-shadow:0 0 6px #fff8}
 .dot.used{background:transparent;border:2px solid var(--line);box-shadow:none}
-#hBoss{font-size:12px;font-weight:800;color:var(--red);text-align:right;min-width:0}
+#hMod{font-size:11.5px;font-weight:800;color:var(--red);text-align:right;min-width:0;line-height:1.2}
+#hZone{font-size:11.5px;font-weight:800;color:var(--teal)}
+/* item bar on top of the board */
+#itemBar{display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;min-height:38px;align-items:stretch;padding-bottom:1px}
+#itemBar::-webkit-scrollbar{display:none}
+.it{flex:none;display:flex;align-items:center;gap:5px;background:var(--panel);border:1.5px solid var(--line);border-radius:10px;padding:3px 7px 3px 4px;font-size:11.5px;font-weight:800;line-height:1.05;transition:background .12s,transform .12s;max-width:150px}
+.it .g{width:26px;height:26px;border-radius:7px;border:2px solid;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:11px;flex:none}
+.it .t{display:flex;flex-direction:column;min-width:0}
+.it .t span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.it .t small{color:var(--muted);font-weight:700;font-size:10px}
+.it .x{font-family:var(--display);font-size:14px;color:var(--gold)}
+.it.fire{background:var(--panel2);transform:translateY(-2px);border-color:var(--gold)}
+.it.sel{border-color:var(--fg)}
+.it.locked{border-style:solid;opacity:.35;width:auto;padding:0 8px;justify-content:center;color:var(--muted);font-size:10.5px}
+.it .burn{color:var(--teal);font-size:10px}
+.it.empty{border-style:dashed;opacity:.45;width:38px;justify-content:center;padding:0;color:var(--muted)}
 #stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative}
 canvas{display:block;border-radius:14px;touch-action:none}
-#live{text-align:center;font-family:var(--display);font-size:22px;min-height:28px;font-variant-numeric:tabular-nums}
+#liveRow{display:flex;align-items:center;gap:8px;min-height:30px}
+#live{flex:1;text-align:center;font-family:var(--display);font-size:20px;font-variant-numeric:tabular-nums;line-height:1.1;min-width:0}
 #live .x{color:var(--red)}
-#live small{font-family:var(--body);font-size:12px;color:var(--muted);font-weight:700}
-#relics{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;min-height:34px}
-.relic{width:34px;height:34px;border-radius:9px;border:2px solid var(--line);background:var(--panel);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:13px;padding:0}
-.relic.empty{border-style:dashed;opacity:.4;cursor:default}
-#info{font-size:12.5px;color:var(--muted);text-align:center;min-height:18px;display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap}
+#live small{font-family:var(--body);font-size:11.5px;color:var(--muted);font-weight:700}
+#bankBtn{font-family:var(--display);font-size:15px;background:var(--gold);color:#2a0a00;border:0;border-radius:10px;padding:7px 11px;box-shadow:0 3px 0 #8a3a00;white-space:nowrap}
+#tray{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:center;min-height:32px}
+.food,.perk{height:30px;border-radius:9px;border:1.5px solid var(--line);background:var(--panel);display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:800;padding:0 8px;white-space:nowrap}
+.food{border-color:#ffb36b;color:#ffcf9e}
+.food.empty{border-style:dashed;opacity:.4;color:var(--muted);border-color:var(--line)}
+.perk{border-color:#9cff57;color:#c9ff9e;border-radius:999px}
+.key{color:var(--gold);font-weight:800;font-size:12px}
+.sep{width:1px;height:20px;background:var(--line)}
+#info{font-size:12.5px;color:var(--muted);text-align:center;min-height:18px;display:flex;gap:6px 8px;justify-content:center;align-items:center;flex-wrap:wrap;line-height:1.3}
 #info b{color:var(--fg)}
-.overlay{position:fixed;inset:0;background:#0b0818e6;display:flex;justify-content:center;overflow-y:auto;z-index:20;padding-top:calc(env(safe-area-inset-top,0px) + 16px);padding-bottom:calc(env(safe-area-inset-bottom,0px) + 16px);padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
-.overlay[hidden],[hidden]{display:none!important}
-.card{width:100%;max-width:520px;margin:auto 0;display:flex;flex-direction:column;gap:14px}
-.logo{font-family:var(--display);font-size:clamp(44px,13vw,68px);line-height:.9;text-align:center;background:linear-gradient(180deg,#fff 10%,#ffc93c 55%,#ff4d6d);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 4px 0 #3b1c5a)}
-.tag{text-align:center;color:var(--muted);font-weight:700;text-wrap:balance}
+.overlay{position:fixed;inset:0;background:#0c0403ee;display:flex;justify-content:center;overflow-y:auto;z-index:20;padding-top:calc(env(safe-area-inset-top,0px) + 14px);padding-bottom:calc(env(safe-area-inset-bottom,0px) + 14px);padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
+.card{width:100%;max-width:520px;margin:auto 0;display:flex;flex-direction:column;gap:12px}
+.logo{font-family:var(--display);font-size:clamp(44px,13vw,68px);line-height:.9;text-align:center;background:linear-gradient(180deg,#fff3c4 8%,#ffb02e 50%,#ff3b2f 85%);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 4px 0 #4a0a05)}
+.tag{text-align:center;color:var(--muted);font-weight:700;text-wrap:balance;font-size:14px}
 h2{font-family:var(--display);font-weight:400;font-size:30px;margin:0;text-align:center;text-wrap:balance}
-h3{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:4px 0 0;font-weight:800}
-.big{font-family:var(--display);font-size:20px;background:var(--gold);color:#2a1a00;border:0;border-radius:14px;padding:14px 18px;box-shadow:0 4px 0 #b3800f}
-.big:active{transform:translateY(2px);box-shadow:0 2px 0 #b3800f}
+h3{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:2px 0 0;font-weight:800}
+.big{font-family:var(--display);font-size:20px;background:var(--gold);color:#2a0a00;border:0;border-radius:14px;padding:13px 18px;box-shadow:0 4px 0 #8a3a00}
+.big:active{transform:translateY(2px);box-shadow:0 2px 0 #8a3a00}
+.big:disabled{background:var(--panel2);color:var(--muted);box-shadow:none}
 .legend{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px 12px;font-size:13px}
 .legend div{display:flex;gap:8px;align-items:center}
-.pd{width:14px;height:14px;border-radius:50%;flex:none}
-.how{font-size:13.5px;line-height:1.5;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.pd{width:14px;height:14px;border-radius:50%;flex:none;display:inline-block}
+.how{font-size:13.5px;line-height:1.5;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
 .how p{margin:0 0 6px}.how p:last-child{margin:0}
 .sum{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px;display:flex;flex-direction:column;gap:3px;font-size:13.5px;font-variant-numeric:tabular-nums}
 .sum div{display:flex;justify-content:space-between;gap:12px}
 .sum .tot{border-top:1px solid var(--line);padding-top:5px;margin-top:3px;font-weight:800;color:var(--gold)}
-.offers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-.offers.two{grid-template-columns:repeat(2,minmax(0,1fr))}
-.offer{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:6px;min-width:0;text-align:left}
+.offers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.offers.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.offer{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:5px;min-width:0;text-align:left;position:relative}
+.offer.frozen{border-color:#8fe3ff;box-shadow:inset 0 0 0 1px #8fe3ff55}
 .offer .ic{width:36px;height:36px;border-radius:9px;border:2px solid;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:14px}
 .offer .nm{font-weight:800;font-size:13.5px;line-height:1.15}
+.offer .trig{font-size:11.5px;font-weight:800;color:var(--gold);line-height:1.25}
 .offer .ds{font-size:12px;color:var(--muted);line-height:1.35;flex:1}
 .offer .rar{font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:800}
-.buy{border:0;border-radius:9px;padding:8px;font-weight:800;background:var(--gold);color:#2a1a00}
-.buy:disabled{background:var(--panel2);color:var(--muted);cursor:default}
+.offer .frz{position:absolute;top:8px;right:8px;font-size:11px;padding:3px 8px}
+.buy{border:0;border-radius:9px;padding:8px;font-weight:800;background:var(--gold);color:#2a0a00}
+.buy:disabled{background:var(--panel2);color:var(--muted)}
 .offer.sold{opacity:.45}
 .shoprow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.owned{display:flex;gap:6px;flex-wrap:wrap}
 .next{text-align:center;font-weight:700;color:var(--muted);font-size:13.5px}
 .next b{color:var(--fg)}.next .boss{color:var(--red)}
 .sellbtn{background:transparent;border:1px solid var(--red);color:var(--red);border-radius:8px;padding:3px 9px;font-size:12px;font-weight:800}
-@media (max-width:400px){.offers{grid-template-columns:repeat(2,minmax(0,1fr))}.stat b{font-size:19px}}
-@media (prefers-reduced-motion:reduce){#hBar{transition:none}}
+.mvbtn{background:transparent;border:1px solid var(--line);color:var(--fg);border-radius:8px;padding:3px 9px;font-size:12px;font-weight:800}
+.usebtn{background:var(--gold);border:0;color:#2a0a00;border-radius:8px;padding:4px 11px;font-size:12px;font-weight:800}
+.ownbar{display:flex;gap:5px;flex-wrap:wrap}
+.claw{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:46px 10px 12px;overflow:hidden}
+.claw .rail{position:absolute;top:10px;left:10px;right:10px;height:4px;background:var(--line);border-radius:2px}
+.claw .hand{position:absolute;top:4px;width:34px;margin-left:-17px;height:32px;display:flex;flex-direction:column;align-items:center}
+.claw .hand i{width:4px;height:16px;background:var(--muted)}
+.claw .hand b{width:28px;height:12px;border:3px solid var(--gold);border-top:0;border-radius:0 0 12px 12px}
+.prizes{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
+.prize{aspect-ratio:1;max-width:100%;border-radius:10px;background:var(--panel2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:clamp(11px,3.4vw,16px);text-align:center;line-height:1}
+.prize.got{background:#3b2f10;border-color:var(--gold);color:var(--gold)}
+.prize.miss{opacity:.3}
+.door{background:#1e0a26;border:1px solid var(--cursed);color:var(--cursed);border-radius:12px;padding:10px;font-weight:800}
+@media (max-width:420px){.offers.three{grid-template-columns:repeat(2,minmax(0,1fr))}.stat b{font-size:18px}}
+@media (prefers-reduced-motion:reduce){#hBar{transition:none}.it{transition:none}}
 </style>
 
 <div id="app">
   <header id="hud">
     <div class="row">
       <div class="stat"><span>Round</span><b id="hRound">1</b></div>
-      <div class="stat"><span>Target</span><b id="hTarget">0</b></div>
-      <div class="stat gold"><span>Gold</span><b id="hGold">0</b></div>
+      <div class="stat"><span>Quota</span><b id="hTarget">0</b></div>
+      <div class="stat gold"><span>Coins</span><b id="hGold">0</b></div>
+      <div class="stat life"><span>Chances</span><b id="hLives">♥♥♥</b></div>
       <div class="spacer"></div>
       <button class="chipbtn" id="hudExp" type="button">Export</button>
       <button class="chipbtn" id="muteBtn" type="button">Sound on</button>
     </div>
     <div class="bar"><div id="hBar"></div><span id="hScore">0 / 0</span></div>
-    <div class="row"><div id="hDrops"></div><div class="spacer"></div><div id="hBoss"></div></div>
+    <div class="row"><div id="hDrops"></div><span id="hZone"></span><div class="spacer"></div><div id="hMod"></div></div>
   </header>
-  <div id="stage"><canvas id="cv" aria-label="Peg board. Move to aim, tap to drop a ball."></canvas></div>
-  <div id="live">Tap the board to drop</div>
-  <div id="relics"></div>
+  <div id="itemBar" aria-label="Your items"></div>
+  <div id="stage"><canvas id="cv" aria-label="Board of Torment. Drag along the top to pick a spot, drag down to tilt the angle, hold still to charge, release to launch."></canvas></div>
+  <div id="liveRow"><div id="live">Drag to aim, hold to charge, release</div><button id="bankBtn" type="button" hidden>End round</button></div>
+  <div id="tray"></div>
   <div id="info"></div>
 </div>
 <div id="ov" class="overlay" hidden><div class="card" id="ovCard"></div></div>
 
 <script>
 (()=>{
-const W=400,H=660,DROP_Y=62,BT=598,NB=7,BW=W/NB,PR=7,BASE_R=7;
-const COL={basic:'#5aa9ff',mult:'#ff4d6d',gold:'#ffc93c',bumper:'#b26bff',splitter:'#2de2c8',crit:'#ff9be0',bomb:'#ff8a3d',post:'#4a3f86'};
-const PEGINFO=[['basic','Blue: points'],['mult','Red: +mult'],['gold','Gold: +1 gold'],['bumper','Purple: big bounce'],['splitter','Teal: splits the ball'],['crit','Pink: doubles mult'],['bomb','Orange: +15 points']];
-const RAR={1:{n:'Common',c:'#a69dd3',p:4},2:{n:'Uncommon',c:'#2de2c8',p:6},3:{n:'Rare',c:'#ff9be0',p:9}};
-const RELICS=[
- {id:'lead',n:'Lead Core',g:'Pb',c:'#9fb4c7',r:1,d:'Blue pegs give +1 point.'},
- {id:'ink',n:'Red Ink',g:'R+',c:'#ff4d6d',r:1,d:'Red pegs give +0.5 more mult.'},
- {id:'spare',n:'Spare Ball',g:'+1',c:'#f3efff',r:2,d:'+1 drop every round.'},
- {id:'twin',n:'Twin Hopper',g:'II',c:'#2de2c8',r:2,d:'Every 3rd drop releases 2 balls.'},
- {id:'rubber',n:'Rubber Walls',g:'||',c:'#7dd87d',r:1,d:'Bouncing off a side wall gives +3 points.'},
- {id:'glass',n:'Glass Cannon',g:'GC',c:'#bde7ff',r:3,d:'Drops score ×1.6, but you get 1 fewer drop per round.'},
- {id:'snow',n:'Snowball',g:'SB',c:'#e8f4ff',r:2,d:'Every 10 hits in one drop gives +1 mult.'},
- {id:'clover',n:'Four Leaf',g:'4L',c:'#5fdc6a',r:1,d:'15% chance a peg hit scores double points.'},
- {id:'die',n:'Loaded Die',g:'D6',c:'#ffd0a8',r:1,d:'Each drop starts with +1 to +4 mult.'},
- {id:'last',n:'Last Call',g:'LC',c:'#ff8a3d',r:2,d:'Your final drop of each round scores ×2.'},
- {id:'head',n:'Head Start',g:'HS',c:'#ffe27a',r:1,d:'Your first drop of each round scores ×1.5.'},
- {id:'haggle',n:'Haggler',g:'$-',c:'#ffc93c',r:1,d:'Rerolls cost 1 less.'},
- {id:'coupon',n:'Coupon Book',g:'%',c:'#ffc93c',r:2,d:'Shop items cost 25% less.'},
- {id:'midas',n:'Midas Touch',g:'Au',c:'#ffc93c',r:2,d:'Every 15th hit in a drop gives 1 gold.'},
- {id:'frenzy',n:'Frenzy',g:'!!',c:'#ff4d6d',r:3,d:'Drops with 40 or more hits score ×2.'},
- {id:'feather',n:'Feather Fall',g:'FF',c:'#d9d2ff',r:2,d:'Gravity is 25% lower, so balls hit more pegs.'},
- {id:'wind',n:'Second Wind',g:'SW',c:'#8fe3ff',r:2,d:'Once per round, a ball landing in the centre bucket goes back to the top.'},
- {id:'prism',n:'Prism',g:'<>',c:'#2de2c8',r:2,d:'Teal splitter pegs release 2 balls instead of 1.'},
- {id:'collector',n:'Collector',g:'Co',c:'#c9a3ff',r:2,d:'Each drop starts with +0.3 mult for every relic you own.'},
- {id:'overtime',n:'Overtime',g:'OT',c:'#ffc93c',r:1,d:'Unused drops pay 3 gold each instead of 1.'},
- {id:'compound',n:'Compound',g:'%%',c:'#ff7f9a',r:3,d:'Red pegs also multiply your mult by ×1.08.'},
- {id:'piggy',n:'Piggy Bank',g:'PB',c:'#ffa8c5',r:1,d:'Interest cap rises from 5 to 10 gold.'},
- {id:'lode',n:'Lodestone',g:'Fe',c:'#ff4d6d',r:3,d:'Balls are pulled gently toward red pegs.'},
- {id:'big',n:'Big Ball',g:'O',c:'#f3efff',r:2,d:'Balls are 40% larger and hit more pegs.'},
- {id:'bounty',n:'Bounty',g:'B$',c:'#ffc93c',r:1,d:'Gold pegs give +2 more gold.'},
- {id:'sharp',n:'Sharp Edge',g:'x3',c:'#ff9be0',r:3,d:'Pink crit pegs multiply mult by ×3 instead of ×2.'},
- {id:'fuse',n:'Long Fuse',g:'LF',c:'#ff8a3d',r:2,d:'Orange bomb pegs give 30 points and recharge every drop.'},
- {id:'echo',n:'Echo',g:'Ec',c:'#a0f0ff',r:2,d:'The first 5 hits of each drop count twice.'},
- {id:'nudge',n:'Wind Charm',g:'<~',c:'#8fe3ff',r:2,d:'While a ball falls, tap left or right of it to nudge it. 3 nudges per drop.'},
- {id:'jackpot',n:'Jackpot',g:'JP',c:'#ffc93c',r:2,d:'The centre bucket becomes ×5.'},
- {id:'chain',n:'Chain Reaction',g:'CR',c:'#b26bff',r:1,d:'Purple bumper hits give +0.25 mult.'},
- {id:'seven',n:'Lucky Seven',g:'7',c:'#5fdc6a',r:1,d:'Every 7th hit in a drop gives +7 points.'},
- {id:'hoard',n:'Dragon Hoard',g:'DH',c:'#ffc93c',r:3,d:'Each drop starts with +1 mult for every 10 gold you hold.'},
- {id:'rebate',n:'Rebate',g:'Rb',c:'#7dd87d',r:1,d:'Get 1 gold back every time you buy something.'},
- {id:'magnum',n:'Magnum Bombs',g:'MB',c:'#ff8a3d',r:2,d:'Bomb pegs also give +2 mult.'},
- {id:'goldrush',n:'Gold Rush',g:'GR',c:'#ffc93c',r:2,d:'Gold pegs also give +3 points.'},
+const W=400,H=660,DROP_Y=62,BT=598,NB=7,BW=W/NB,BASE_R=7,FINAL=60,LAUNCH=320,MAX_ANG=1.05;
+const SPECIAL={mult:'#9cff57',gold:'#ffd54a',bumper:'#b26bff',splitter:'#5ce1ff',crit:'#ff4fd8',bomb:'#ff6a00'};
+const SPECIAL_GLYPH={mult:'×',gold:'$',bumper:'',splitter:'Y',crit:'!',bomb:'*'};
+const PEGINFO=[['num','Torment pegs: give their value in suffering, then halve. Pop at 0'],['mult','Wrath sigil: +1 mult'],['gold','Coin sigil: +1 soul coin'],['bumper','Rubber sigil: big bounce'],['splitter','Split sigil: splits the soul'],['crit','Agony sigil: doubles mult'],['bomb','Sulfur sigil: blast, once a round']];
+const RAR={1:{n:'Common',c:'#d9a38f',p:5},2:{n:'Uncommon',c:'#9cff57',p:8},3:{n:'Rare',c:'#ffb02e',p:12},4:{n:'Cursed',c:'#c86bff',p:0},5:{n:'Temporary',c:'#5ce1ff',p:6}};
+const TRIG={start:'When a drop starts',hit:'Every peg hit',pop:'Every peg popped',firstPop:'First pop of each drop',wall:'When the soul hits a wall',land:'When a soul lands',end:'When a drop ends',quota:'When you meet quota',restock:'Every restock',round:'When a round starts',bump:'Every rubber sigil hit',bigPop:'Popping a peg born at 8+',passive:'Always on'};
+const trigText=it=>it.every?`Every ${it.every} ${it.trig==='popN'?'pops':it.trig==='hitN'?'hits':'wall hits'}`:TRIG[it.trig];
+const ITEMS=[
+ {id:'sling',n:'Pitchfork Jab',g:'SS',r:1,trig:'start',d:L=>`+${4*L} points`,fn:L=>addPts(4*L)},
+ {id:'lantern',n:'Brimstone Lantern',g:'Ln',r:1,trig:'start',d:L=>`+${L} mult`,fn:L=>addMult(L)},
+ {id:'ember',n:'Ember',g:'Em',r:1,trig:'pop',d:L=>`+${fmt(.2*L)} mult`,fn:L=>addMult(.2*L)},
+ {id:'tally',n:'Tally of Sins',g:'TS',r:1,trig:'popN',every:10,d:L=>`+${L} mult`,fn:L=>addMult(L)},
+ {id:'spring',n:'Bouncy Contract',g:'SG',r:1,trig:'wall',d:L=>`+${3*L} points and a bounce boost`,fn:(L,c)=>{addPts(3*L);if(c.ball)c.ball.vy-=120}},
+ {id:'fork',n:'Flaming Trident',g:'TF',r:2,trig:'hitN',every:15,d:L=>`Split off ${L} extra soul${L>1?'s':''}`,fn:(L,c)=>{const b=c.ball||anyBall();if(b)for(let i=0;i<L;i++)spawn(b.x,b.y,(rnd()-.5)*300,-80)}},
+ {id:'firecracker',n:'Hellcracker',g:'Fc',r:2,trig:'firstPop',d:L=>`Blast the pegs around it (size ${L})`,fn:(L,c)=>c.peg&&explode(c.peg.x,c.peg.y,55+15*L)},
+ {id:'lens',n:'Doubling Clause',g:'DL',r:2,trig:'start',d:L=>`Double ${2*L} random pegs`,fn:L=>doublePegs(2*L)},
+ {id:'piggy',n:'Tithe Box',g:'PB',r:1,trig:'round',d:L=>`+${2*L} coins`,fn:L=>addCoins(2*L)},
+ {id:'purse',n:'Soul Purse',g:'CP',r:2,trig:'restock',d:L=>`+${L} coin`,fn:L=>addCoins(L)},
+ {id:'prism',n:'Cracked Halo',g:'Pr',r:1,trig:'land',d:L=>`+${fmt(.5*L)} bucket mult`,fn:L=>{D.bucketBonus+=.5*L}},
+ {id:'hourglass',n:'Overtime Hourglass',g:'Hg',r:2,trig:'quota',d:L=>`+${L} drop${L>1?'s':''} this round`,fn:L=>{st.dropsLeft+=L;st.dropsMax+=L}},
+ {id:'bell',n:'Funeral Bell',g:'EB',r:2,trig:'hit',d:L=>`${6*L}% chance to hit the peg again`,fn:(L,c)=>{if(c.peg&&c.peg.kind==='num'&&rnd()<.06*L)c.again=true}},
+ {id:'amp',n:'Demonic Amplifier',g:'Am',r:3,trig:'passive',d:()=>`The item to its right triggers twice`},
+ {id:'mirror',n:'Mirror of Vanity',g:'Mi',r:3,trig:'passive',d:()=>`Copies the item to its left every time it triggers`},
+ {id:'snowball',n:'Snowball\'s Chance',g:'Sb',r:1,trig:'hit',d:L=>`+${fmt(.05*L)} mult`,fn:L=>addMult(.05*L)},
+ {id:'magnet',n:'Lure of Avarice',g:'Mg',r:2,trig:'passive',d:()=>`Souls drift toward your biggest pegs`},
+ {id:'core',n:'Millstone',g:'HC',r:1,trig:'passive',d:()=>`Souls are 35% heavier and bigger`},
+ {id:'wreck',n:'Wrecking Chain',g:'WB',r:2,trig:'wall',d:L=>`The next ${L} peg hit${L>1?'s':''} count 3 times`,fn:L=>{D.triple+=L}},
+ {id:'glove',n:'Pickpocket Imp',g:'TG',r:1,trig:'pop',d:L=>`${10*L}% chance of +1 coin`,fn:L=>{if(rnd()<.1*L)addCoins(1)}},
+ {id:'popcorn',n:'Kettle Imp',g:'Pc',r:1,trig:'popN',every:20,d:L=>`Pop ${3*L} random 1-pegs`,fn:L=>popRandom(3*L,p=>p.v===1)},
+ {id:'saw',n:'Bone Saw',g:'BS',r:2,trig:'hitN',every:8,d:L=>`Pop the ${L} peg${L>1?'s':''} nearest the soul`,fn:(L,c)=>{const b=c.ball||anyBall();if(b)popNearest(b,L)}},
+ {id:'goldleaf',n:'Gilded Ledger',g:'GL',r:2,trig:'start',d:L=>`+${L} point${L>1?'s':''} per coin you hold`,fn:L=>addPts(st.coins*L)},
+ {id:'overclock',n:'Infernal Overdrive',g:'OC',r:3,trig:'quota',d:L=>`+${50*L}% score for the rest of the round`,fn:L=>{st.roundBonus+=.5*L}},
+ {id:'seed',n:'Seeds of Doubt',g:'Sp',r:1,trig:'round',d:L=>`${3*L} random pegs grow to 4× base`,fn:L=>growPegs(3*L)},
+ {id:'fusion',n:'Fusion Furnace',g:'FC',r:3,trig:'restock',d:L=>`${L} extra merge pass${L>1?'es':''}`,fn:L=>{for(let i=0;i<L;i++)mergePass()}},
+ {id:'ladder',n:'Stairway Down',g:'RL',r:1,trig:'land',d:L=>`Landing in the middle bucket: +${20*L} points`,fn:(L,c)=>{if(c.bucket===3)addPts(20*L)}},
+ {id:'dice',n:'Devil\'s Dice',g:'LD',r:1,trig:'start',d:L=>`+1 to +${4+2*L} mult`,fn:L=>addMult(1+Math.floor(rnd()*(4+2*L)))},
+ {id:'bombbag',n:'Sulfur Bombs',g:'BB',r:2,trig:'hitN',every:25,d:L=>`Blast around the soul (size ${L})`,fn:(L,c)=>{const b=c.ball||anyBall();if(b)explode(b.x,b.y,60+15*L)}},
+ {id:'ricochet',n:'Ricochet Rune',g:'RR',r:1,trig:'bump',d:L=>`+${L} mult`,fn:L=>addMult(L)},
+ {id:'pinata',n:'Greed Piñata',g:'Pñ',r:2,trig:'bigPop',d:L=>`+${2*L} coins`,fn:L=>addCoins(2*L)},
+ {id:'quill',n:'Contract Quill',g:'Qu',r:2,trig:'start',d:L=>`Points equal to ${L}× your biggest peg`,fn:L=>addPts(maxPeg()*L)},
+ {id:'coupon',n:'Employee Discount',g:'%',r:1,trig:'passive',d:()=>'Commissary and canteen prices are 20% lower'},
+ {id:'hopper',n:'Extra Chute',g:'+1',r:2,trig:'passive',d:()=>'+1 drop every round'},
+ {id:'clover',n:'Cursed Clover',g:'4L',r:1,trig:'hit',d:L=>`${8*L}% chance the hit scores double`,fn:(L,c)=>{if(rnd()<.08*L)c.dbl=true}},
+ {id:'ghost',n:'Doppelgänger',g:'GB',r:2,trig:'start',d:L=>`${20*L}% chance to launch a second soul`,fn:L=>{if(rnd()<.2*L)spawn(aimX,DROP_Y,(rnd()-.5)*160,LAUNCH*.6)}},
+ {id:'compass',n:'Lost Compass',g:'Cm',r:2,trig:'land',d:L=>`Landing in an outer bucket: ×${1+L*.5} mult`,fn:(L,c)=>{if(c.bucket===0||c.bucket===6)D.mult*=1+L*.5}},
+ {id:'battery',n:'Lightning Rod',g:'Bt',r:1,trig:'wallN',every:3,d:L=>`+${2*L} mult`,fn:L=>addMult(2*L)},
+ {id:'metronome',n:'Drumbeat of Doom',g:'Mt',r:1,trig:'hitN',every:5,d:L=>`+${6*L} points`,fn:L=>addPts(6*L)},
+ {id:'crown',n:'Crown of Thorns',g:'PC',r:3,trig:'end',d:L=>`If this drop popped ${15-4*L}+ pegs: ×2 mult`,fn:L=>{if(D.pops>=15-4*L)D.mult*=2}},
+ {id:'compost',n:'Grave Compost',g:'Cp',r:2,trig:'restock',d:L=>`Double ${L} random peg${L>1?'s':''}`,fn:L=>doublePegs(L)},
+ {id:'cashback',n:'Kickback',g:'Cb',r:1,trig:'quota',d:L=>`+${4*L} coins`,fn:L=>addCoins(4*L)},
+ {id:'kite',n:'Sulfur Updraft',g:'Ki',r:1,trig:'passive',d:()=>'Gravity is 20% lower, so souls hit more pegs'},
+ {id:'overtimeForm',n:'Overtime Form',g:'OF',r:5,burn:3,trig:'end',d:L=>`Drops score ×${1+.5*L}. Burns out after 3 rounds.`,fn:L=>{D.mult*=1+.5*L}},
+ {id:'hound',n:'Leased Hellhound',g:'LH',r:5,burn:3,trig:'start',d:L=>`+${5*L} mult. Burns out after 3 rounds.`,fn:L=>addMult(5*L)},
+ {id:'surge',n:'Power Surge',g:'PS',r:5,burn:2,trig:'hit',d:L=>`+${fmt(.3*L)} mult. Burns out after 2 rounds.`,fn:L=>addMult(.3*L)},
+ {id:'rocket',n:'Hellfire Rocket',g:'Rk',r:2,trig:'wallN',every:4,d:L=>`Blast at the soul (size ${L})`,fn:(L,c)=>{const b=c.ball||anyBall();if(b)explode(b.x,b.y,50+15*L)}},
 ];
-const UPG=[
- {id:'sharpen',n:'Sharpen Pegs',t:'basic',d:'All blue pegs give +1 point.',p:4},
- {id:'addRed',n:'Red Pegs',t:'mult',d:'Turn 2 blue pegs red. Red adds +1 mult.',p:4},
- {id:'addGold',n:'Gold Pegs',t:'gold',d:'Turn 2 blue pegs gold. Gold gives 1 gold per hit.',p:3},
- {id:'addBump',n:'Bumpers',t:'bumper',d:'Turn 2 blue pegs into purple bumpers. +2 points and a big bounce.',p:3},
- {id:'addSplit',n:'Splitter Peg',t:'splitter',d:'Turn 1 blue peg teal. It splits the ball once per drop.',p:5},
- {id:'addCrit',n:'Crit Peg',t:'crit',d:'Turn 1 blue peg pink. It doubles your mult once per drop.',p:6},
- {id:'addBomb',n:'Bomb Pegs',t:'bomb',d:'Turn 2 blue pegs orange. +15 points, once per round.',p:4},
- {id:'edges',n:'Wider Payouts',t:'post',d:'The two outer buckets get +1 mult.',p:5},
- {id:'hotred',n:'Red Hot',t:'mult',d:'Red pegs give +0.5 more mult.',p:5},
- {id:'hopper',n:'Extra Hopper',t:'post',d:'+1 drop every round, for the rest of the run.',p:9},
+const CURSED=[
+ {id:'pact',n:'Blood Pact',g:'BP',r:4,trig:'start',d:()=>`×3 mult. Taking it costs 1 life.`,fn:()=>{D.mult*=3},gain:()=>{st.lives=Math.max(1,st.lives-1)}},
+ {id:'void',n:'Void Engine',g:'VE',r:4,trig:'pop',d:()=>`+1 mult per pop. Restocks give no coins.`,fn:()=>addMult(1)},
+ {id:'glassheart',n:'Glass Heart',g:'GH',r:4,trig:'end',d:()=>`Drops score ×3. Your max lives become 1.`,fn:()=>{D.mult*=3},gain:()=>{st.maxLives=1;st.lives=1}},
+ {id:'blackhole',n:'Black Hole',g:'BH',r:4,trig:'hitN',every:10,d:()=>`Pop every peg near the soul, scoring full value`,fn:(L,c)=>{const b=c.ball||anyBall();if(b)explode(b.x,b.y,95,true)}},
+ {id:'curse',n:'Midas Curse',g:'MC',r:4,trig:'restock',d:()=>`+3 coins per restock. Prices are 50% higher.`,fn:()=>addCoins(3)},
+ {id:'mouth',n:'Hungry Maw',g:'HM',r:4,trig:'start',d:()=>`+1 mult per 2 empty slots`,fn:()=>addMult(Math.floor(emptyCount()/2))},
+ {id:'clock',n:'Shattered Clock',g:'SC',r:4,trig:'passive',d:()=>'+2 drops every round. Targets are 30% higher.'},
+ {id:'abyss',n:'Abyss Lens',g:'AL',r:4,trig:'start',d:()=>'Double every number peg as a drop starts. Halve them all when it ends.',fn:()=>st.pegs.forEach(p=>{if(p.kind==='num')p.v*=2})},
+];
+const IT={};ITEMS.concat(CURSED).forEach(i=>IT[i.id]=i);
+const PERKS=[
+ {id:'spark',n:'Oath of Kindling',d:'Every 25 pops, trigger your leftmost item.'},
+ {id:'rebound',n:'Oath of Recoil',d:'Hitting a wall triggers your rightmost item.'},
+ {id:'ignition',n:'Oath of Ignition',d:'When a drop starts, trigger the item in slot 2.'},
+ {id:'lap',n:'Oath of Triumph',d:'When you meet quota, trigger every item once.'},
+ {id:'jackpot',n:'Oath of Fortune',d:'Landing in a ×4 bucket triggers your leftmost item.'},
+ {id:'rush',n:'Oath of Supply',d:'Every 5 restocks, trigger your rightmost item.'},
+ {id:'sweep',n:'Oath of Purge',d:'Clearing the board triggers every item twice.'},
+ {id:'early',n:'Oath of the First Scream',d:'The first drop of each round triggers your leftmost item 3 times.'},
+ {id:'thick',n:'Hide of the Beast',d:'+1 max chance and +1 chance now.',gain:()=>{st.maxLives++;st.lives++}},
+ {id:'pockets',n:'Bottomless Coffers',d:'Interest cap rises from 5 to 12 coins.'},
+ {id:'pocket',n:'Extra Shelf',d:'+1 item slot (up to 7).',gain:()=>{st.slots=Math.min(7,st.slots+1)}},
+ {id:'chef',n:'Canteen Tab',d:'+1 snack slot.',gain:()=>{st.foodSlots++}},
+];
+const FOODS=[
+ {id:'tea',n:'Lava Latte',p:5,d:'+1 chance (up to your max).',use:()=>{if(st.lives>=st.maxLives)return false;st.lives++}},
+ {id:'pretzel',n:'Twisted Pretzel',p:4,d:'+2 drops this round.',use:()=>{st.dropsLeft+=2;st.dropsMax+=2}},
+ {id:'pie',n:'Devil\'s Food Cake',p:7,d:'Double every torment peg on the board.',use:()=>st.pegs.forEach(p=>{if(p.kind==='num')p.v*=2})},
+ {id:'soup',n:'Bone Broth',p:5,d:'Call in 3 consignments of the damned now (+3 coins).',use:()=>restock(3)},
+ {id:'cookie',n:'Misfortune Cookie',p:6,d:'Get a random item, if you have a free slot.',use:()=>{const it=randomItem();if(!it||!gainItem(it.id,0))return false}},
+ {id:'espresso',n:'Hellspresso',p:5,d:'Your next drop scores ×3.',use:()=>{st.espresso=true}},
+ {id:'jam',n:'Brimstone Jam',p:6,d:'Level up a random item.',use:()=>{const c=st.inv.filter(x=>x.L<3&&IT[x.id].r<4);if(!c.length)return false;pick(c).L++}},
+ {id:'popsicle',n:'Lava Pop',p:3,d:'Pop every 1-peg, scoring each.',use:()=>{popRandom(999,p=>p.v===1,true)}},
+];
+const ELITES=[
+ {id:'heavy',n:'Gravity Audit',d:'Souls fall 40% faster.'},
+ {id:'shrink',n:'Budget Cuts',d:'Bucket mults are halved.'},
+ {id:'blackout',n:'Power Outage',d:'8 random pegs switch off.'},
+ {id:'short',n:'Overtime Ban',d:'1 fewer launch this round.'},
+ {id:'tax',n:'Tax Season',d:'Coin sigils and restocks give no coins.'},
 ];
 const BOSSES=[
- {id:'heavy',n:'Heavy Gravity',d:'Balls fall 40% faster.'},
- {id:'shrink',n:'Tight Buckets',d:'Bucket mults are halved.'},
- {id:'blackout',n:'Blackout',d:'8 random pegs switch off.'},
- {id:'short',n:'Short Fuse',d:'1 fewer drop this round.'},
- {id:'tax',n:'Tax Man',d:'Gold pegs give no gold.'},
+ {id:'foreman',n:'Middle Manager Malphas',d:'Sigils are switched off, gravity is heavy, and he confiscates your biggest peg after every launch.'},
+ {id:'gardener',n:'Groundskeeper Gremory',d:'Before every launch, 6 random pegs wither away.'},
+ {id:'astronomer',n:'Auditor Astaroth',d:'Buckets shuffle every launch and the middle three pay ×0.5.'},
 ];
-const MAX_RELICS=8;
-const APPB=window.PegmancerApp||null;
-const VERSION=(()=>{try{return APPB?APPB.version():'web'}catch(e){return 'web'}})();
+const QUIPS=[[1,'ADEQUATE.'],[3,'THE AUDITOR IS… TEMPORARILY APPEASED.'],[10,'Upper management has taken an interest.'],[50,'Your supervisor is visibly sweating.'],[250,'Reality is warping. Higher demons are watching.'],[2000,'THE LEDGER CANNOT HOLD THESE NUMBERS.']];
+const ZONES=['Intake Office','Lava Works','Bone Archive','The Abyss'];
+const BOARD_UPG=[
+ {id:'addRed',n:'Wrath Sigils',k:'mult',d:'Turn 2 torment pegs into wrath sigils (+1 mult each).',p:5},
+ {id:'addGold',n:'Coin Sigils',k:'gold',d:'Turn 2 torment pegs into coin sigils (+1 coin per hit).',p:4},
+ {id:'addBump',n:'Rubber Sigils',k:'bumper',d:'Turn 2 torment pegs into rubber sigils (big bounce).',p:4},
+ {id:'addSplit',n:'Split Sigil',k:'splitter',d:'Turn 1 torment peg into a split sigil. It splits the soul once per launch.',p:6},
+ {id:'addCrit',n:'Agony Sigil',k:'crit',d:'Turn 1 torment peg into an agony sigil. It doubles mult once per launch.',p:8},
+ {id:'addBomb',n:'Sulfur Sigils',k:'bomb',d:'Turn 2 torment pegs into sulfur sigils. They blast once per round.',p:5},
+ {id:'edges',n:'Wider Payouts',k:'gold',d:'The two outer buckets get +1 mult.',p:6},
+ {id:'hotred',n:'Righteous Fury',k:'mult',d:'Wrath sigils give +0.5 more mult.',p:6},
+];
 
 const $=id=>document.getElementById(id);
 const cv=$('cv'),ctx=cv.getContext('2d'),stage=$('stage'),ov=$('ov'),ovCard=$('ovCard');
+const APPB=window.PegmancerApp||null;
+const VERSION=(()=>{try{return APPB?APPB.version():'web'}catch(e){return 'web'}})();
 let scale=1;
-const rnd=Math.random, pick=a=>a[Math.floor(rnd()*a.length)];
+const rnd=Math.random,pick=a=>a[Math.floor(rnd()*a.length)];
 const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
-const fmt=n=>{if(n>=1e6)return (n/1e6).toFixed(2)+'M';if(n>=1e4)return Math.round(n/1e3)+'k';return Number.isInteger(n)?String(n):n.toFixed(n<10?2:1).replace(/\.?0+$/,'')};
-const fmtInt=n=>Math.floor(n).toLocaleString();
+function fmt(n){if(!isFinite(n))return '∞';const a=Math.abs(n);if(a>=1e15)return n.toExponential(2).replace('+','');if(a>=1e12)return (n/1e12).toFixed(2)+'T';if(a>=1e9)return (n/1e9).toFixed(2)+'B';if(a>=1e6)return (n/1e6).toFixed(2)+'M';if(a>=1e4)return (n/1e3).toFixed(1)+'k';if(Number.isInteger(n))return String(n);return n.toFixed(a<10?2:1).replace(/\.?0+$/,'')}
+const fmtInt=n=>fmt(Math.floor(n));
 function load(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}}
 function save(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
-let st=null, D=null, balls=[], pops=[], aimX=W/2, pressing=false, selRelic=null, shake=0;
-let best=load('pegmancer.best',{round:0,drop:0});
-const has=id=>st&&st.relics.some(r=>r.id===id);
+let st=null,D=null,balls=[],pops=[],aimX=W/2,aimAng=0,dragging=false,sel=null,shake=0,depth=0,chargeStart=0,anchor=null;
+const chargeNow=()=>dragging?Math.min(1,(performance.now()-chargeStart)/1100):0;
+let best=load('pegmancer.best2',{round:0,drop:0});
+const has=id=>!!(st&&st.inv&&st.inv.some(x=>x.id===id));
+const hasPerk=id=>!!(st&&st.perks&&st.perks.includes(id));
 
 // ---------- audio ----------
 let ac=null,muted=load('pegmancer.muted',false),lastBlip=0;
 function initAudio(){if(ac)return;try{ac=new (window.AudioContext||window.webkitAudioContext)()}catch(e){ac=null}}
 function blip(f,d=.06,type='triangle',v=.05){
-  if(muted||!ac)return;const now=ac.currentTime;if(now-lastBlip<.018)return;lastBlip=now;
-  const o=ac.createOscillator(),g=ac.createGain();o.type=type;o.frequency.setValueAtTime(f,now);o.frequency.exponentialRampToValueAtTime(f*1.5,now+d);
+  if(muted||!ac)return;const now=ac.currentTime;if(now-lastBlip<.02)return;lastBlip=now;
+  const o=ac.createOscillator(),g=ac.createGain();o.type=type;o.frequency.setValueAtTime(Math.min(f,4000),now);o.frequency.exponentialRampToValueAtTime(Math.min(f*1.5,6000),now+d);
   g.gain.setValueAtTime(v,now);g.gain.exponentialRampToValueAtTime(.0001,now+d);o.connect(g).connect(ac.destination);o.start(now);o.stop(now+d+.02);
 }
 function chord(fs){fs.forEach((f,i)=>setTimeout(()=>{lastBlip=0;blip(f,.18,'square',.035)},i*70))}
 $('muteBtn').onclick=()=>{muted=!muted;save('pegmancer.muted',muted);$('muteBtn').textContent=muted?'Sound off':'Sound on';initAudio()};
 $('muteBtn').textContent=muted?'Sound off':'Sound on';
-$('hudExp').onclick=()=>{if(st&&st.log&&ov.hidden)showExport(summaryText(),hideOv)};
 
 // ---------- board ----------
-function buildPegs(){
-  const pegs=[];
+const zoneOf=r=>Math.min(3,Math.floor((r-1)/20));
+const baseVal=()=>Math.pow(2,Math.floor(st.round/5));
+function layoutSlots(z){
+  const pts=[];
   for(let row=0;row<10;row++){
-    const y=136+row*44, even=row%2===0, n=even?8:7;
-    for(let i=0;i<n;i++) pegs.push({x:even?25+50*i:50+50*i,y,type:'basic',flash:0,cool:0,used:false,spent:false,off:false});
+    const y0=132+row*45,even=row%2===0,n=even?8:7;
+    for(let i=0;i<n;i++){
+      let x=even?25+50*i:50+50*i,y=y0;
+      if(z===1&&Math.hypot(x-200,(y-334)*1.15)<70)continue;
+      if(z===2)y+=14*Math.cos((x-200)/200*Math.PI*.9)-6;
+      if(z===3){x+=(rnd()-.5)*10;y+=(rnd()-.5)*10}
+      pts.push({x:Math.max(12,Math.min(W-12,x)),y});
+    }
   }
-  const idx=shuffle(pegs.map((_,i)=>i));
-  for(let k=0;k<5;k++)pegs[idx[k]].type='mult';
-  for(let k=5;k<8;k++)pegs[idx[k]].type='gold';
-  pegs[idx[8]].type='bumper';
-  return pegs;
+  return pts;
 }
-const posts=[];for(let i=1;i<NB;i++)posts.push({x:i*BW,y:BT,type:'post'});
+function newPeg(v){const b=baseVal();if(v==null){const r=rnd();v=r<.55?b:r<.85?b*2:b*4}return v}
+function buildBoard(){
+  const slots=layoutSlots(zoneOf(st.round));
+  st.pegs=slots.map(s=>({x:s.x,y:s.y,kind:'num',v:newPeg(),born:0,flash:0,cool:0,used:false,spent:false,off:false,nb:[]}));
+  st.pegs.forEach(p=>{p.born=p.v;p.nb=st.pegs.filter(q=>q!==p&&Math.hypot(q.x-p.x,q.y-p.y)<64)});
+  const idx=shuffle(st.pegs.map((_,i)=>i));let k=0;
+  for(const [kind,n] of Object.entries(st.specials))for(let i=0;i<n&&k<idx.length;i++){const p=st.pegs[idx[k++]];p.kind=kind;p.v=0}
+}
+function fillEmpty(){let n=0;const b=baseVal();st.pegs.forEach(p=>{if(p.kind===null){p.kind='num';p.v=b;p.born=b;p.flash=.6;n++}});return n}
+function mergePass(){
+  const done=new Set();
+  for(const p of st.pegs){
+    if(p.kind!=='num'||done.has(p))continue;
+    const q=p.nb.find(q=>q.kind==='num'&&q.v===p.v&&!done.has(q));
+    if(q){p.v*=2;p.born=Math.max(p.born,p.v);q.kind=null;q.v=0;done.add(p);done.add(q);p.flash=.5}
+  }
+}
+function restock(n){
+  n=Math.min(n,500);let coins=0;
+  for(let k=0;k<n;k++){
+    fillEmpty();mergePass();st.restocksRound++;st.restocksRun++;
+    if(!has('void')&&!(st.mod&&st.mod.id==='tax')){st.coins++;coins++}
+    fire('restock',{});
+    if(hasPerk('rush')&&st.restocksRun%5===0)forceTrigger('last',1);
+  }
+  if(n>0){popup(W/2,BT-60,`Consignment ×${n}${coins?'  +'+coins+' coins':''}`,'#ffc93c',18);blip(880,.15,'square',.04)}
+}
+const numPegs=()=>st.pegs.filter(p=>p.kind==='num'&&!p.off);
+const emptyCount=()=>st.pegs.filter(p=>p.kind===null).length;
+const boardTotal=()=>st.pegs.reduce((a,p)=>a+(p.kind==='num'?p.v:0),0);
+const maxPeg=()=>st.pegs.reduce((a,p)=>Math.max(a,p.kind==='num'?p.v:0),0);
+function doublePegs(n){shuffle(numPegs()).slice(0,n).forEach(p=>{p.v*=2;p.born=Math.max(p.born,p.v);p.flash=1})}
+function growPegs(n){const t=baseVal()*4;shuffle(numPegs()).slice(0,n).forEach(p=>{p.v=Math.max(p.v,t);p.born=Math.max(p.born,p.v);p.flash=1})}
+function convert(kind,n){shuffle(numPegs()).slice(0,n).forEach(p=>{p.kind=kind;p.v=0;p.flash=1});st.specials[kind]=(st.specials[kind]||0)+n}
 function bucketMult(i){
+  if(st.bucketOrder)i=st.bucketOrder[i];
   let m=[4,2,1.5,1,1.5,2,4][i];
-  if(i===3&&has('jackpot'))m=5;
-  if((i===0||i===6))m+=st.perm.edge;
-  if(st.boss&&st.boss.id==='shrink')m=Math.max(.5,m/2);
+  if(i===0||i===6)m+=st.perm.edge;
+  if(st.mod&&st.mod.id==='astronomer'&&i>=2&&i<=4)m=.5;
+  if(st.mod&&st.mod.id==='shrink')m=Math.max(.5,m/2);
   return m;
 }
-function convert(type,n){
-  const c=shuffle(st.pegs.filter(p=>p.type==='basic'));
-  c.slice(0,n).forEach(p=>{p.type=type;p.flash=1});
-  return c.length>0;
+function target(){
+  const r=st.round;let t=(25+boardTotal())*(1+.15*(r-1))*Math.pow(1.045,r-1);
+  if(st.mod)t*=st.mod.boss?1.6:1.25;
+  if(has('clock'))t*=1.3;
+  const mag=Math.pow(10,Math.max(0,Math.floor(Math.log10(t))-1));return Math.ceil(t/mag)*mag;
 }
-function target(n){const t=80*Math.pow(1.5,n-1)*(n%4===0?1.35:1);const mag=Math.pow(10,Math.max(0,Math.floor(Math.log10(t))-1));return Math.round(t/mag)*mag}
+
+// ---------- items & triggers ----------
+const flashT=[];
+function runItem(i,times){
+  const x=st.inv[i];if(!x)return;const it=IT[x.id];if(!it.fn)return;
+  if(depth>5)return;depth++;
+  let n=times||1;if(st.inv[i-1]&&st.inv[i-1].id==='amp')n*=2;
+  for(let k=0;k<n;k++){it.fn(x.L,curCtx);x.fired=(x.fired||0)+1;if(st.inv[i+1]&&st.inv[i+1].id==='mirror'){it.fn(x.L,curCtx);st.inv[i+1].fired=(st.inv[i+1].fired||0)+1;flashT[i+1]=performance.now()}}
+  flashT[i]=performance.now();depth--;
+}
+let curCtx={};
+function fire(trig,c){
+  if(!st||!st.inv)return;const prev=curCtx;curCtx=c||{};
+  st.inv.forEach((x,i)=>{const it=IT[x.id];if(it.trig===trig&&!it.every)runItem(i)});
+  curCtx=prev;
+}
+function fireEvery(trig,count,c){
+  const prev=curCtx;curCtx=c||{};
+  st.inv.forEach((x,i)=>{const it=IT[x.id];if(it.trig===trig&&it.every&&count%it.every===0)runItem(i)});
+  curCtx=prev;
+}
+function forceTrigger(which,times,c){
+  if(!st.inv.length)return;const prev=curCtx;curCtx=c||curCtx;
+  if(which==='all')st.inv.forEach((_,i)=>runItem(i,times));
+  else{const i=which==='first'?0:which==='last'?st.inv.length-1:which;if(st.inv[i])runItem(i,times)}
+  curCtx=prev;
+}
+function addPts(n){if(D)D.points+=n}
+function addMult(n){if(D)D.mult+=n}
+function addCoins(n){st.coins+=n}
+function anyBall(){return balls.find(b=>b.alive)}
+function gainItem(id,paid){
+  const it=IT[id],own=st.inv.find(x=>x.id===id);
+  if(own){if(it.r===4||own.L>=3)return false;own.L++;own.paid+=paid;if(it.burn)own.burn=it.burn;return true}
+  if(st.inv.length>=st.slots)return false;
+  st.inv.push({id,L:1,paid,fired:0,burn:it.burn});if(it.gain)it.gain();return true;
+}
+function priceMul(){let m=1+st.round/30;if(has('coupon'))m*=.8;if(has('curse'))m*=1.5;return m}
+const itemPrice=it=>Math.max(1,Math.round(RAR[it.r].p*priceMul()));
+function randomItem(pool){
+  pool=pool||ITEMS.filter(it=>{const o=st.inv.find(x=>x.id===it.id);return !o||o.L<3});
+  if(!pool.length)return null;const w=[];pool.forEach(it=>{for(let i=0;i<(it.r===1?6:it.r===2||it.r===5?3:1);i++)w.push(it)});return pick(w);
+}
 
 // ---------- run flow ----------
 function newRun(){
-  st={round:1,gold:4,relics:[],pegs:buildPegs(),perm:{lvl:0,red:0,edge:0,drops:0},boss:null,nextBoss:pick(BOSSES),
-      dropsLeft:0,dropsMax:0,dropNo:0,roundScore:0,target:0,windUsed:false,nudges:0,phase:'aim',bestDrop:0,rerolls:0,offers:null,
-      log:{started:new Date().toISOString(),drops:[],rounds:[],shop:[]}};
-  selRelic=null;startRound();
+  st={round:1,lives:3,maxLives:3,coins:5,inv:[],slots:4,perks:[],foods:[],foodSlots:2,keys:0,frozen:[],
+      specials:{mult:5,gold:3,bumper:1},perm:{edge:0,red:0},pegs:[],mod:null,bucketOrder:null,
+      dropsLeft:0,dropsMax:0,dropNo:0,roundScore:0,tgt:0,restocksRound:0,restocksRun:0,quotaHit:false,roundBonus:0,espresso:false,
+      phase:'aim',bestDrop:0,offers:null,endless:false,
+      log:{started:new Date().toISOString(),drops:[],rounds:[],events:[]}};
+  buildBoard();sel=null;startRound();
 }
+function logEv(s){st.log.events.push({r:st.round,e:s})}
 function startRound(){
-  st.boss=st.round%4===0?st.nextBoss:null;
+  const r=st.round;st.bucketOrder=null;
+  st.mod=r%20===0?Object.assign({boss:true},BOSSES[(r/20-1)%3]):r%5===0?pick(ELITES):null;
   st.pegs.forEach(p=>{p.off=false;p.spent=false;p.used=false});
-  if(st.boss&&st.boss.id==='blackout')shuffle(st.pegs.slice()).slice(0,8).forEach(p=>p.off=true);
-  st.dropsMax=Math.max(1,5+(has('spare')?1:0)+st.perm.drops-(has('glass')?1:0)-(st.boss&&st.boss.id==='short'?1:0));
-  st.dropsLeft=st.dropsMax;st.dropNo=0;st.roundScore=0;st.target=target(st.round);st.windUsed=false;
-  st.phase='aim';D=null;balls=[];
-  setLive('Tap the board to drop');hideOv();renderRelics();
+  fillEmpty();
+  if(st.mod&&st.mod.id==='blackout')shuffle(st.pegs.slice()).slice(0,8).forEach(p=>p.off=true);
+  if(st.mod&&st.mod.id==='foreman')st.pegs.forEach(p=>{if(p.kind!=='num'&&p.kind!==null)p.off=true});
+  st.dropsMax=Math.max(1,5+(has('hopper')?1:0)+(has('clock')?2:0)-(st.mod&&st.mod.id==='short'?1:0));
+  st.dropsLeft=st.dropsMax;st.dropNo=0;st.roundScore=0;st.quipLevel=0;st.restocksRound=0;st.quotaHit=false;st.roundBonus=0;
+  D={points:0,mult:1};fire('round',{});D=null;
+  st.tgt=target();st.phase='aim';balls=[];aimAng=0;
+  setLive('Drag to aim, hold to charge, release');hideOv();renderTray();renderBar();
 }
-function gravity(){let g=950;if(has('feather'))g*=.75;if(st.boss&&st.boss.id==='heavy')g*=1.4;return g}
-function ballR(){return has('big')?BASE_R*1.4:BASE_R}
-function spawn(x,y,vx,vy){if(balls.filter(b=>b.alive).length>=14)return;balls.push({x,y,vx,vy,alive:true,t:0,still:0,bin:-1,trail:[]})}
-function tryDrop(){
+function gravity(){let g=950;if(has('kite'))g*=.8;if(st.mod&&(st.mod.id==='heavy'||st.mod.id==='foreman'))g*=1.4;return g}
+function ballR(){return st&&has('core')?BASE_R*1.35:BASE_R}
+function spawn(x,y,vx,vy){if(balls.filter(b=>b.alive).length>=16)return;balls.push({x,y,vx,vy,alive:true,t:0,still:0,bin:-1,trail:[],lastWall:-1})}
+function tryDrop(ch=0){
   if(!st||st.phase!=='aim'||st.dropsLeft<=0)return;
-  st.phase='falling';st.dropNo++;
-  D={points:0,mult:1,hits:0,bucket:0};
-  if(has('die'))D.mult+=1+Math.floor(rnd()*4);
-  if(has('collector'))D.mult+=.3*st.relics.length;
-  if(has('hoard'))D.mult+=Math.floor(st.gold/10);
-  st.nudges=has('nudge')?3:0;
+  st.phase='falling';st.dropNo++;sel=null;renderTray();
+  D={points:0,mult:1,hits:0,pops:0,walls:0,bucket:0,bucketBonus:0,firstPop:false,cleared:false,triple:0,espresso:st.espresso};st.espresso=false;
   st.pegs.forEach(p=>p.used=false);
-  const twin=has('twin')&&st.dropNo%3===0;
-  if(twin){spawn(aimX-8,DROP_Y,-20,0);spawn(aimX+8,DROP_Y,20,0)}else spawn(aimX,DROP_Y,(rnd()-.5)*10,0);
+  if(st.mod&&st.mod.id==='gardener')shuffle(numPegs()).slice(0,6).forEach(p=>{p.kind=null;p.v=0});
+  if(st.mod&&st.mod.id==='astronomer')st.bucketOrder=shuffle([0,1,2,3,4,5,6]);
+  const spd=LAUNCH*(.75+.5*ch);spawn(aimX,DROP_Y,Math.sin(aimAng)*spd,Math.cos(aimAng)*spd*.6);
+  if(ch>=1){balls[balls.length-1].fire=5;popup(aimX,DROP_Y+28,'HELLFIRE SOUL','#ff6a00',18);shake=6}
+  D.charge=ch;
+  fire('start',{});
+  if(hasPerk('ignition'))forceTrigger(1,1);
+  if(hasPerk('early')&&st.dropNo===1)forceTrigger('first',3);
   blip(220,.08,'sine',.06);
 }
-function popup(x,y,text,color='#fff',size=14){pops.push({x,y,text,color,size,t:0})}
+function popup(x,y,text,color='#fff',size=14){if(pops.length>140)pops.shift();pops.push({x,y,text,color,size,t:0})}
 
-function hitPeg(p,b){
-  if(p.type==='post')return;
-  const now=performance.now();if(now<p.cool)return;p.cool=now+90;p.flash=1;
-  D.hits++;let pts=0,gold=0,f=440;
-  const tax=st.boss&&st.boss.id==='tax';
-  switch(p.type){
-    case 'basic':pts=1+st.perm.lvl+(has('lead')?1:0);f=520+Math.min(D.hits,40)*12;break;
-    case 'mult':{const m=1+st.perm.red+(has('ink')?.5:0);D.mult+=m;if(has('compound'))D.mult*=1.08;popup(p.x,p.y-12,'+'+fmt(m)+' mult',COL.mult,13);f=330;break}
-    case 'gold':pts=1+(has('goldrush')?3:0);gold=tax?0:1+(has('bounty')?2:0);if(gold)popup(p.x,p.y-12,'+'+gold+'g',COL.gold,13);f=880;break;
-    case 'bumper':pts=2;if(has('chain'))D.mult+=.25;f=260;break;
-    case 'splitter':pts=1;if(!p.used){p.used=true;const n=has('prism')?2:1;for(let i=0;i<n;i++)spawn(b.x,b.y,(i%2?1:-1)*(120+rnd()*60)*(n===1?(rnd()<.5?1:-1):1),-60);popup(p.x,p.y-12,'Split!',COL.splitter,13);f=660}break;
-    case 'crit':if(!p.used){p.used=true;const m=has('sharp')?3:2;D.mult*=m;popup(p.x,p.y-12,'×'+m+' mult',COL.crit,15);shake=5;f=990}else pts=1;break;
-    case 'bomb':if(!p.spent){p.spent=true;pts=has('fuse')?30:15;if(has('magnum'))D.mult+=2;popup(p.x,p.y-12,'BOOM +'+pts,COL.bomb,15);shake=7;f=110}else pts=1;break;
+function hitPeg(p,b,blast){
+  if(!p.kind||p.off)return;
+  const now=performance.now();
+  if(!blast){if(now<p.cool)return;p.cool=now+90}
+  p.flash=1;D.hits++;
+  const c={peg:p,ball:b,dbl:false,again:false};
+  fire('hit',c);
+  switch(p.kind){
+    case 'mult':{const m=1+st.perm.red;D.mult+=m;popup(p.x,p.y-12,'+'+fmt(m)+' mult',SPECIAL.mult,12);blip(330);break}
+    case 'gold':{const tax=st.mod&&st.mod.id==='tax';if(!tax){st.coins++;popup(p.x,p.y-12,'+1c',SPECIAL.gold,12)}addPts(1);blip(880);break}
+    case 'bumper':addPts(2);fire('bump',c);blip(260);break;
+    case 'splitter':if(!p.used&&b){p.used=true;spawn(b.x,b.y,(rnd()<.5?-1:1)*(140+rnd()*60),-60);popup(p.x,p.y-12,'Split!',SPECIAL.splitter,13);blip(660)}break;
+    case 'crit':if(!p.used){p.used=true;D.mult*=2;popup(p.x,p.y-12,'×2 mult',SPECIAL.crit,15);shake=5;blip(990)}break;
+    case 'bomb':if(!p.spent){p.spent=true;popup(p.x,p.y-12,'BOOM',SPECIAL.bomb,16);shake=8;blip(110,.2,'sawtooth');explode(p.x,p.y,75)}break;
+    case 'num':{
+      let f=1;if(c.dbl)f*=2;if(D.triple>0){f*=3;D.triple--}
+      const val=p.v*f;addPts(val);
+      popup(p.x,p.y-12,'+'+fmt(val),c.dbl||f>1?'#ffc93c':'#cfe4ff',11);
+      blip(420+Math.min(Math.log2(p.v+1)*60,900));
+      p.v=Math.floor(p.v/2);
+      if(p.v<=0)popPeg(p,b);
+      else if(c.again)hitPeg(p,b,true);
+      if(b&&b.fire>0&&!blast){b.fire--;explode(p.x,p.y,38)}
+      break;
+    }
   }
-  if(has('echo')&&D.hits<=5)pts*=2;
-  if(pts&&has('clover')&&rnd()<.15){pts*=2;popup(p.x+10,p.y+4,'×2',COL.gold,11)}
-  if(has('seven')&&D.hits%7===0){pts+=7;popup(p.x,p.y+14,'+7',COL.good,12)}
-  if(has('midas')&&D.hits%15===0){gold+=1;popup(p.x,p.y+14,'+1g',COL.gold,12)}
-  if(has('snow')&&D.hits%10===0){D.mult+=1;popup(p.x,p.y+14,'+1 mult',COL.mult,12)}
-  if(pts&&p.type==='basic')popup(p.x,p.y-10,'+'+pts,'#cfe4ff',11);
-  D.points+=pts;st.gold+=gold;
-  blip(f);
+  fireEvery('hitN',D.hits,{peg:p,ball:b});
 }
-function landBall(b){
-  const i=Math.max(0,Math.min(NB-1,b.bin>=0?b.bin:Math.floor(b.x/BW)));
-  if(i===3&&has('wind')&&!st.windUsed){st.windUsed=true;b.x=aimX;b.y=DROP_Y;b.vx=0;b.vy=0;b.bin=-1;b.t=0;b.trail=[];popup(W/2,BT-20,'Second Wind!',COL.splitter,16);blip(700,.15,'sine');return}
-  b.alive=false;const m=bucketMult(i);D.bucket=Math.max(D.bucket,m);
-  bucketFlash[i]=1;popup(i*BW+BW/2,BT-14,'×'+fmt(m),'#fff',16);blip(300+m*120,.12,'square',.04);
+function popPeg(p,b){
+  const born=p.born;p.kind=null;p.v=0;D.pops++;
+  const c={peg:p,ball:b};
+  fire('pop',c);
+  if(!D.firstPop){D.firstPop=true;fire('firstPop',c)}
+  fireEvery('popN',D.pops,c);
+  if(born>=8)fire('bigPop',c);
+  if(hasPerk('spark')&&D.pops%25===0)forceTrigger('first',1,c);
+  if(!D.cleared&&!st.pegs.some(q=>q.kind==='num'&&!q.off)){D.cleared=true;popup(W/2,H/2-60,'BOARD PURGED ×2',SPECIAL.gold,24);chord([523,784,1046]);fire('clear',c);if(hasPerk('sweep'))forceTrigger('all',2,c)}
 }
+function explode(x,y,r,full){
+  if(depth>6)return;depth++;
+  for(const p of st.pegs){
+    if(!p.kind||p.off||p.kind!=='num')continue;
+    if(Math.hypot(p.x-x,p.y-y)>r)continue;
+    if(full){addPts(p.v);popPeg(p,null)}else hitPeg(p,null,true);
+  }
+  blasts.push({x,y,r,t:0});depth--;
+}
+function popRandom(n,filter,score){shuffle(numPegs().filter(filter)).slice(0,n).forEach(p=>{if(D)addPts(p.v);if(D)popPeg(p,null);else{p.kind=null;p.v=0}})}
+function popNearest(b,n){numPegs().sort((a,c)=>Math.hypot(a.x-b.x,a.y-b.y)-Math.hypot(c.x-b.x,c.y-b.y)).slice(0,n).forEach(p=>{addPts(p.v);popPeg(p,b)})}
+const blasts=[];
 const bucketFlash=new Array(NB).fill(0);
+function landBall(b){
+  b.alive=false;
+  const i=Math.max(0,Math.min(NB-1,b.bin>=0?b.bin:Math.floor(b.x/BW)));
+  fire('land',{bucket:i,ball:b});
+  const m=bucketMult(i);
+  if(hasPerk('jackpot')&&m>=4)forceTrigger('first',1,{bucket:i,ball:b});
+  D.bucket=Math.max(D.bucket,m+D.bucketBonus);
+  bucketFlash[i]=1;popup(i*BW+BW/2,BT-14,'×'+fmt(m+D.bucketBonus),'#fff',16);blip(300+m*120,.12,'square',.04);
+}
 function finishDrop(){
-  let s=D.points*D.mult*D.bucket;const tags=[];
-  if(has('glass')){s*=1.6;tags.push('Glass ×1.6')}
-  if(has('head')&&st.dropNo===1){s*=1.5;tags.push('Head Start ×1.5')}
-  if(has('last')&&st.dropsLeft===1){s*=2;tags.push('Last Call ×2')}
-  if(has('frenzy')&&D.hits>=40){s*=2;tags.push('Frenzy ×2')}
+  fire('end',{});
+  let s=D.points*D.mult*Math.max(D.bucket,.5);const tags=[];
+  if(D.cleared){s*=2;tags.push('Board cleared ×2')}
+  if(st.roundBonus){s*=1+st.roundBonus;tags.push('Overclock +'+Math.round(st.roundBonus*100)+'%')}
+  if(D.espresso){s*=3;tags.push('Espresso ×3')}
+  if(has('abyss'))st.pegs.forEach(p=>{if(p.kind==='num'){p.v=Math.floor(p.v/2);if(p.v<=0){p.kind=null;p.v=0}}});
   s=Math.floor(s);
-  st.log.drops.push({r:st.round,d:st.dropNo,pts:+D.points.toFixed(2),mult:+D.mult.toFixed(2),bucket:D.bucket,hits:D.hits,score:s,tags});
+  st.log.drops.push({r:st.round,d:st.dropNo,pts:+D.points.toFixed(1),mult:+D.mult.toFixed(2),bucket:+D.bucket.toFixed(2),hits:D.hits,pops:D.pops,score:s,ang:Math.round(aimAng*57.3),ch:+(D.charge||0).toFixed(2),tags});
   st.roundScore+=s;st.dropsLeft--;st.bestDrop=Math.max(st.bestDrop,s);
-  if(s>best.drop){best.drop=s;save('pegmancer.best',best)}
-  if(has('fuse'))st.pegs.forEach(p=>p.spent=false);
-  popup(W/2,H/2-30,'+'+fmtInt(s),'#fff',34);
-  setLive(`<span>${fmt(D.points)}</span> <span class="x">× ${fmt(D.mult)}</span> × ${fmt(D.bucket)} = ${fmtInt(s)}${tags.length?'<br><small>'+tags.join(' · ')+'</small>':''}`);
-  if(st.roundScore>=st.target){st.phase='between';chord([523,659,784,1046]);setTimeout(roundWon,1200)}
-  else if(st.dropsLeft<=0){st.phase='between';chord([392,330,262]);setTimeout(gameOver,1200)}
+  if(s>best.drop){best.drop=s;save('pegmancer.best2',best)}
+  popup(W/2,H/2-20,'+'+fmtInt(s),'#fff',32);
+  const before=st.restocksRound;
+  if(!st.quotaHit&&st.roundScore>=st.tgt){st.quotaHit=true;fire('quota',{});if(hasPerk('lap'))forceTrigger('all',1);chord([523,659,784])}
+  const earned=Math.min(500,Math.floor(st.roundScore/st.tgt))-st.restocksRound;
+  if(earned>0)restock(earned);
+  if(st.mod&&st.mod.id==='foreman'&&st.dropsLeft>0){const big=numPegs().sort((a,b)=>b.v-a.v)[0];if(big){popup(big.x,big.y-14,'CONFISCATED '+fmt(big.v),'#ff3b2f',15);big.kind=null;big.v=0}}
+  const ratio=st.roundScore/st.tgt;let q=null;for(const [lv,txt] of QUIPS)if(ratio>=lv&&st.quipLevel<lv){q=txt;st.quipLevel=lv}
+  if(q){popup(W/2,120,q,'#9cff57',q.length>30?13:18);tags.push('Supervisor: '+q)}
+  setLive(`<span>${fmt(st.log.drops.at(-1).pts)}</span> <span class="x">× ${fmt(st.log.drops.at(-1).mult)}</span> × ${fmt(D.bucket)} = ${fmtInt(s)}${tags.length||st.restocksRound>before?'<br><small>'+tags.concat(st.restocksRound>before?['Consignments: '+(st.restocksRound-before)]:[]).join(' · ')+'</small>':''}`);
+  D=null;
+  if(st.dropsLeft<=0){st.phase='between';setTimeout(endRound,1100)}
   else st.phase='aim';
+  renderBar();
 }
-function roundWon(){
-  const base=4+Math.floor(st.round/3);
-  const left=st.dropsLeft*(has('overtime')?3:1);
-  const interest=Math.min(Math.floor(st.gold/5),has('piggy')?10:5);
-  const bossBonus=st.boss?5:0;
-  const lines=[['Round reward',base],[`Unused drops (${st.dropsLeft})`,left],['Interest',interest]];
-  if(bossBonus)lines.push(['Boss beaten',bossBonus]);
-  const total=base+left+interest+bossBonus;st.gold+=total;
-  st.log.rounds.push({r:st.round,target:st.target,score:st.roundScore,won:true,dropsUsed:st.dropsMax-st.dropsLeft,dropsMax:st.dropsMax,goldEarned:total,goldAfter:st.gold,boss:st.boss?st.boss.n:null});
-  if(st.round>best.round){best.round=st.round;save('pegmancer.best',best)}
-  if(st.boss)st.nextBoss=pick(BOSSES);
-  st.rerolls=0;st.offers=rollOffers();
-  showShop(lines,total);
+function endRound(){
+  if(st.phase==='over')return;
+  st.phase='between';balls=[];
+  const won=st.roundScore>=st.tgt;
+  const lines=[];
+  if(won){
+    const base=3+Math.floor(st.round/10);
+    const left=st.dropsLeft*2;
+    const interest=Math.min(Math.floor(st.coins/5),hasPerk('pockets')?12:5);
+    const boss=st.mod&&st.mod.boss?10:st.mod?3:0;
+    lines.push(['Quota bonus',base],[`Unused launches (${st.dropsLeft})`,left],['Interest',interest]);if(boss)lines.push([st.mod.boss?'Demon outlasted':'Audit passed',boss]);
+    lines.push(['Consignments this round (already paid)',st.restocksRound]);
+    const total=base+left+interest+boss;st.coins+=total;
+    if(st.mod&&st.mod.boss){st.keys++;lines.push(['Ledger Key','+1'])}
+    chord([523,659,784,1046]);
+  }else{st.lives--;chord([392,330,262])}
+  st.log.rounds.push({r:st.round,target:st.tgt,score:st.roundScore,won,dropsUsed:st.dropsMax-st.dropsLeft,dropsMax:st.dropsMax,restocks:st.restocksRound,coinsAfter:st.coins,lives:st.lives,mod:st.mod?st.mod.n:null});
+  st.inv=st.inv.filter(x=>{if(x.burn==null)return true;x.burn--;if(x.burn<=0){logEv(IT[x.id].n+' burned out');return false}return true});sel=null;renderBar();
+  if(won&&st.round>best.round){best.round=st.round;save('pegmancer.best2',best)}
+  if(st.lives<=0)return gameOver();
+  const head=won?`Quota met. The screams have been logged.`:`Quota missed. A formal warning has been filed.`;
+  if(won&&st.round===FINAL&&!st.endless)return showVictory(lines);
+  afterRound(head,lines);
 }
-function priceOf(p){let v=p;if(has('coupon'))v=Math.ceil(v*.75);return v}
-function rerollCost(){return Math.max(1,2+st.rerolls-(has('haggle')?1:0))}
-function rollOffers(){
-  const pool=RELICS.filter(r=>!has(r.id));
-  const weighted=[];pool.forEach(r=>{const w=r.r===1?5:r.r===2?3:1;for(let i=0;i<w;i++)weighted.push(r)});
-  const rel=[];shuffle(weighted);for(const r of weighted){if(!rel.includes(r))rel.push(r);if(rel.length===3)break}
-  const upg=shuffle(UPG.slice()).slice(0,2);
-  return {rel:rel.map(r=>({kind:'relic',item:r,sold:false})),upg:upg.map(u=>({kind:'upg',item:u,sold:false}))};
+function afterRound(head,lines){
+  const r=st.round;
+  if(r%20===0)return showPerkPick(head,lines,()=>showMarket(null,null));
+  if(r%10===0)return showPerkPick(head,lines,nextRound);
+  if(r%3===0)return showMarket(head,lines);
+  if(r%3===1)return showCafe(head,lines);
+  return showClaw(head,lines);
 }
-function applyUpg(u){
-  switch(u.id){
-    case 'sharpen':st.perm.lvl++;break;case 'addRed':convert('mult',2);break;case 'addGold':convert('gold',2);break;
-    case 'addBump':convert('bumper',2);break;case 'addSplit':convert('splitter',1);break;case 'addCrit':convert('crit',1);break;
-    case 'addBomb':convert('bomb',2);break;case 'edges':st.perm.edge++;break;case 'hotred':st.perm.red+=.5;break;case 'hopper':st.perm.drops++;break;
-  }
+function nextRound(){
+  const z=zoneOf(st.round);st.round++;sel=null;
+  if(zoneOf(st.round)!==z){buildBoard();logEv('Entered '+ZONES[zoneOf(st.round)])}
+  startRound();
 }
-function buy(o){
-  const price=priceOf(o.kind==='relic'?RAR[o.item.r].p:o.item.p);
-  if(o.sold||st.gold<price)return;
-  if(o.kind==='relic'&&st.relics.length>=MAX_RELICS)return;
-  st.gold-=price;o.sold=true;
-  st.log.shop.push({r:st.round,act:'buy',kind:o.kind,name:o.item.n,price});
-  if(o.kind==='relic')st.relics.push(o.item);else applyUpg(o.item);
-  if(has('rebate'))st.gold+=1;
-  chord([660,880]);renderRelics();rerenderShop();
-}
-function sellRelic(r){const v=Math.floor(RAR[r.r].p/2);st.log.shop.push({r:st.round,act:'sell',kind:'relic',name:r.n,price:v});st.relics=st.relics.filter(x=>x!==r);st.gold+=v;selRelic=null;renderRelics();if(!ov.hidden&&shopState)rerenderShop();else renderInfo()}
 
 // ---------- overlays ----------
-let shopState=null;
-function hideOv(){ov.hidden=true;shopState=null}
-function showOv(html){ovCard.innerHTML=html;ov.hidden=false;ov.scrollTop=0}
-function legendHTML(){return '<div class="legend">'+PEGINFO.map(([t,l])=>`<div><span class="pd" style="background:${COL[t]};box-shadow:0 0 8px ${COL[t]}"></span>${l}</div>`).join('')+'</div>'}
+let ovBack=null;
+function hideOv(){ov.hidden=true;ovBack=null;exportBack=null}
+function showOv(html){ovCard.innerHTML=html;ov.hidden=false}
+function sumHTML(head,lines){if(!head)return '';return `<h2>${head}</h2>${lines&&lines.length?`<div class="sum">${lines.map(([a,b])=>`<div><span>${a}</span><span>${typeof b==='number'?'+'+b:b}</span></div>`).join('')}<div class="tot"><span>Coins</span><span>${st.coins}</span></div></div>`:''}`}
+function legendHTML(){return '<div class="legend">'+PEGINFO.map(([t,l])=>`<div><span class="pd" style="background:${t==='num'?'#5aa9ff':SPECIAL[t]}"></span>${l}</div>`).join('')+'</div>'}
 function showTitle(){
-  shopState=null;
   showOv(`<div class="logo">PEG<br>MANCER</div>
-  <div class="tag">Drop balls, rack up points × mult, and build a broken combo before the targets outrun you.</div>
-  <div class="how"><p><b>Aim</b> by moving or dragging along the top of the board. <b>Release or tap</b> to drop.</p>
-  <p>Each drop scores <b>points × mult × bucket</b>. Beat the round target before you run out of drops.</p>
-  <p>Spend gold in the shop on <b>relics</b> and <b>board upgrades</b>. Every 4th round is a boss with a twist.</p></div>
+  <div class="tag">You are a lowly devil intern. Launch damned souls down the Boards of Torment and make quota, or the Infernal Auditor will unmake you.</div>
+  <div class="how"><p><b>Aim:</b> drag along the top to pick a spot, drag down into the board to tilt the angle. <b>Hold still to charge.</b> A full charge launches a Hellfire soul that burns the first 5 pegs it hits. Release to launch.</p>
+  <p>Each launch scores <b>suffering × mult × bucket</b>. A torment peg gives its value, then halves. At 0 it pops.</p>
+  <p>Every time your round total passes quota again, a <b>fresh consignment of the damned</b> arrives: empty slots refill, matching neighbours fuse into greater sinners, and you get a soul coin.</p>
+  <p>Relics in the bar above the board fire on their trigger, left to right. Order matters. Miss quota and you lose a chance. Survive ${FINAL} rounds to make Pegmancer.</p></div>
   ${legendHTML()}
   <button class="big" id="startBtn" type="button">Start run</button>
   ${best.round?`<div class="next">Best: <b>round ${best.round}</b> · best drop <b>${fmtInt(best.drop)}</b></div>`:''}
@@ -363,56 +587,165 @@ function showTitle(){
   const lb=$('lastBtn');if(lb)lb.onclick=()=>showExport(load('pegmancer.lastRun',''),showTitle);
   const ub=$('updBtn');if(ub)ub.onclick=()=>{try{APPB.checkUpdate()}catch(e){}};
 }
-function showShop(lines,total){shopState={lines,total};rerenderShop()}
-function offerHTML(o,i){
-  const isR=o.kind==='relic',it=o.item,price=priceOf(isR?RAR[it.r].p:it.p);
-  const full=isR&&st.relics.length>=MAX_RELICS;
-  const can=!o.sold&&st.gold>=price&&!full;
-  const icon=isR?`<div class="ic" style="border-color:${it.c};color:${it.c}">${it.g}</div>`:`<div class="ic" style="border-color:${COL[it.t]};background:${COL[it.t]}22"><span class="pd" style="background:${COL[it.t]}"></span></div>`;
-  return `<div class="offer ${o.sold?'sold':''}">${icon}<div class="nm">${it.n}</div>
-   ${isR?`<div class="rar" style="color:${RAR[it.r].c}">${RAR[it.r].n}</div>`:''}
-   <div class="ds">${it.d}</div>
-   <button class="buy" data-k="${o.kind}" data-i="${i}" type="button" ${can?'':'disabled'}>${o.sold?'Bought':full?'Relics full':price+' gold'}</button></div>`;
+function itemCard(it,price,btn,extra=''){
+  const own=st.inv.find(x=>x.id===it.id);
+  const lvl=own&&it.r<4?Math.min(3,own.L+1):1;
+  return `<div class="ic" style="border-color:${RAR[it.r].c};color:${RAR[it.r].c}">${it.g}</div>
+   <div class="nm">${it.n}${own&&it.r<4?` <span style="color:var(--gold)">→ ×${lvl}</span>`:''}</div>
+   <div class="rar" style="color:${RAR[it.r].c}">${RAR[it.r].n}</div>
+   <div class="trig">${trigText(it)}</div>
+   <div class="ds">${it.d(lvl)}</div>${extra}${btn}`;
 }
-function rerenderShop(){
-  if(!shopState)return;const {lines,total}=shopState,O=st.offers,nr=st.round+1,nb=nr%4===0;
-  const owned=st.relics.map((r,i)=>`<button class="relic" type="button" data-own="${i}" style="border-color:${r.c};color:${r.c}" title="${r.n}">${r.g}</button>`).join('');
-  const sel=selRelic&&st.relics.includes(selRelic)?`<div id="info"><span><b>${selRelic.n}</b> ${selRelic.d}</span><button class="sellbtn" id="sellSel" type="button">Sell for ${Math.floor(RAR[selRelic.r].p/2)} gold</button></div>`:'';
-  showOv(`<h2>Round ${st.round} cleared</h2>
-   <div class="sum">${lines.map(([a,b])=>`<div><span>${a}</span><span>+${b}</span></div>`).join('')}<div class="tot"><span>Gold now</span><span>${st.gold}</span></div></div>
-   <h3>Relics · ${st.relics.length}/${MAX_RELICS} slots</h3>
-   <div class="offers">${O.rel.map(offerHTML).join('')||'<div class="ds">You own every relic.</div>'}</div>
-   <h3>Board upgrades</h3>
-   <div class="offers two">${O.upg.map(offerHTML).join('')}</div>
-   <div class="shoprow"><button class="chipbtn" id="rerollBtn" type="button" ${st.gold>=rerollCost()?'':'disabled'}>Reroll shop · ${rerollCost()} gold</button><div class="spacer"></div><span style="color:var(--gold);font-weight:800">${st.gold} gold</span></div>
-   ${st.relics.length?`<h3>Your relics (tap to sell)</h3><div class="owned">${owned}</div>${sel}`:''}
-   <div class="next">Next: <b>Round ${nr}</b> · target <b>${fmtInt(target(nr))}</b>${nb?`<br><span class="boss">Boss: ${st.nextBoss.n}. ${st.nextBoss.d}</span>`:''}</div>
-   <button class="big" id="contBtn" type="button">Start round ${nr}</button>
-   <button class="chipbtn" id="shopExp" type="button">Export run summary</button>`);
-  $('shopExp').onclick=()=>{const keep=shopState;showExport(summaryText(),()=>{shopState=keep;rerenderShop()})};
-  ovCard.querySelectorAll('.buy').forEach(bt=>bt.onclick=()=>{const o=(bt.dataset.k==='relic'?O.rel:O.upg)[+bt.dataset.i];buy(o)});
-  ovCard.querySelectorAll('[data-own]').forEach(bt=>bt.onclick=()=>{const r=st.relics[+bt.dataset.own];selRelic=selRelic===r?null:r;rerenderShop()});
-  const sb=$('sellSel');if(sb)sb.onclick=()=>sellRelic(selRelic);
-  $('rerollBtn').onclick=()=>{const c=rerollCost();if(st.gold<c)return;st.gold-=c;st.rerolls++;st.log.shop.push({r:st.round,act:'reroll',price:c});st.offers=rollOffers();blip(500,.1);rerenderShop()};
-  $('contBtn').onclick=()=>{st.round++;selRelic=null;startRound()};
+function ownedHTML(){
+  if(!st.inv.length)return '';
+  const s=sel&&sel.t==='item'&&st.inv[sel.i]?st.inv[sel.i]:null;
+  return `<h3>Your relics · ${st.inv.length}/${st.slots} shelves (tap to sell or move)</h3>
+  <div class="ownbar">${st.inv.map((x,i)=>{const it=IT[x.id];return `<button class="it ${s===x?'sel':''}" type="button" data-own="${i}"><span class="g" style="border-color:${RAR[it.r].c};color:${RAR[it.r].c}">${it.g}</span><span class="x">×${x.L}</span></button>`}).join('')}</div>
+  ${s?`<div id="ovInfo" class="next" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;align-items:center"><span><b>${IT[s.id].n}</b> ${trigText(IT[s.id])}: ${IT[s.id].d(s.L)}</span>
+   <button class="mvbtn" id="mvL" type="button">◀ Move</button><button class="mvbtn" id="mvR" type="button">Move ▶</button><button class="sellbtn" id="sellO" type="button">Sell ${sellValue(s)}c</button></div>`:''}`;
+}
+function wireOwned(rerender){
+  ovCard.querySelectorAll('[data-own]').forEach(b=>b.onclick=()=>{const i=+b.dataset.own;sel=sel&&sel.t==='item'&&sel.i===i?null:{t:'item',i};rerender()});
+  const s=$('sellO');if(s)s.onclick=()=>{sellItem(sel.i);sel=null;rerender()};
+  const l=$('mvL');if(l)l.onclick=()=>{moveItem(sel.i,-1);rerender()};
+  const r=$('mvR');if(r)r.onclick=()=>{moveItem(sel.i,1);rerender()};
+}
+const sellValue=x=>IT[x.id].r===4?1:Math.max(1,Math.floor(x.paid/2));
+function sellItem(i){const x=st.inv[i];if(!x)return;st.coins+=sellValue(x);logEv(`sold ${IT[x.id].n} ×${x.L} for ${sellValue(x)}`);st.inv.splice(i,1);renderBar();renderTray()}
+function moveItem(i,d){const j=i+d;if(j<0||j>=st.inv.length)return;[st.inv[i],st.inv[j]]=[st.inv[j],st.inv[i]];sel={t:'item',i:j};renderBar()}
+
+// Market
+function rollMarket(keepFrozen){
+  const frozen=keepFrozen?st.frozen.filter(o=>!o.sold):[];
+  const items=frozen.slice();const used=new Set(frozen.map(o=>o.it.id));
+  for(let guard=0;items.length<4&&guard<60;guard++){const it=randomItem();if(!it)break;if(used.has(it.id))continue;used.add(it.id);items.push({it,price:itemPrice(it),sold:false,frozen:false})}
+  const up=pick(BOARD_UPG);
+  st.offers={items,up:{u:up,price:Math.round(up.p*priceMul()),sold:false},rerolls:0,slotBought:false};
+}
+function showMarket(head,lines){ovBack={head,lines};rollMarket(true);renderMarket()}
+function rerollCost(){const n=st.offers.rerolls;return n===0?0:Math.round((2+n)*priceMul())}
+const slotCost=()=>[0,0,0,0,10,16,24,30][st.slots]||99;
+function renderMarket(){
+  const O=st.offers,{head,lines}=ovBack||{};
+  const full=st.inv.length>=st.slots;
+  const items=O.items.map((o,i)=>{const own=st.inv.find(x=>x.id===o.it.id);const can=!o.sold&&st.coins>=o.price&&(own||!full);
+    return `<div class="offer ${o.sold?'sold':''} ${o.frozen?'frozen':''}">${!o.sold?`<button class="chipbtn frz" data-frz="${i}" type="button">${o.frozen?'Frozen':'Freeze'}</button>`:''}${itemCard(o.it,o.price,`<button class="buy" data-buy="${i}" type="button" ${can?'':'disabled'}>${o.sold?'Bought':!own&&full?'Slots full':o.price+' coins'}</button>`)}</div>`}).join('');
+  const U=O.up;
+  showOv(`${sumHTML(head,lines)}
+   <h2 style="font-size:24px">Infernal Commissary</h2>
+   <div class="offers">${items}</div>
+   <h3>Board upgrade</h3>
+   <div class="offers"><div class="offer ${U.sold?'sold':''}"><div class="ic" style="border-color:${SPECIAL[U.u.k]};background:${SPECIAL[U.u.k]}22"><span class="pd" style="background:${SPECIAL[U.u.k]}"></span></div><div class="nm">${U.u.n}</div><div class="ds">${U.u.d}</div><button class="buy" id="buyUp" type="button" ${!U.sold&&st.coins>=U.price?'':'disabled'}>${U.sold?'Bought':U.price+' coins'}</button></div>
+   <div class="offer"><div class="ic" style="border-color:var(--fg);color:var(--fg)">+</div><div class="nm">Extra relic shelf</div><div class="ds">${st.slots>=7?'You have the maximum of 7 slots.':`Go from ${st.slots} to ${st.slots+1} slots.`}</div><button class="buy" id="buySlot" type="button" ${st.slots<7&&!O.slotBought&&st.coins>=slotCost()?'':'disabled'}>${st.slots>=7?'Maxed':O.slotBought?'Bought':slotCost()+' coins'}</button></div></div>
+   <div class="shoprow"><button class="chipbtn" id="rerollBtn" type="button" ${st.coins>=rerollCost()?'':'disabled'}>Reroll · ${rerollCost()?rerollCost()+' coins':'free'}</button><div class="spacer"></div><span style="color:var(--gold);font-weight:800">${st.coins} coins</span></div>
+   ${st.keys?`<button class="door" id="doorBtn" type="button">Use a Ledger Key (${st.keys}) to open the Black Ledger</button>`:''}
+   ${ownedHTML()}
+   ${nextHTML()}
+   <button class="big" id="contBtn" type="button">Start round ${st.round+1}</button>
+   <button class="chipbtn" id="ovExp" type="button">Export run summary</button>`);
+  ovCard.querySelectorAll('[data-buy]').forEach(b=>b.onclick=()=>{const o=O.items[+b.dataset.buy];if(o.sold||st.coins<o.price)return;if(!gainItem(o.it.id,o.price))return;st.coins-=o.price;o.sold=true;o.frozen=false;logEv(`bought ${o.it.n} for ${o.price}`);chord([660,880]);renderBar();renderMarket()});
+  ovCard.querySelectorAll('[data-frz]').forEach(b=>b.onclick=()=>{const o=O.items[+b.dataset.frz];o.frozen=!o.frozen;renderMarket()});
+  $('buyUp').onclick=()=>{if(U.sold||st.coins<U.price)return;st.coins-=U.price;U.sold=true;const u=U.u;if(u.id==='edges')st.perm.edge++;else if(u.id==='hotred')st.perm.red+=.5;else convert(u.k,/Split|Agony/.test(u.n)?1:2);logEv(`bought board upgrade ${u.n} for ${U.price}`);chord([660,880]);renderMarket()};
+  $('buySlot').onclick=()=>{const c=slotCost();if(st.slots>=7||O.slotBought||st.coins<c)return;st.coins-=c;st.slots++;O.slotBought=true;logEv(`bought item slot ${st.slots} for ${c}`);renderBar();renderMarket()};
+  $('rerollBtn').onclick=()=>{const c=rerollCost();if(st.coins<c)return;st.coins-=c;const keep=O.items.filter(o=>o.frozen&&!o.sold);const r=O.rerolls+1;st.frozen=keep;rollMarket(true);st.offers.rerolls=r;st.offers.up=O.up;st.offers.slotBought=O.slotBought;logEv(`reroll for ${c}`);blip(500,.1);renderMarket()};
+  const door=$('doorBtn');if(door)door.onclick=()=>{st.keys--;logEv('used a Ledger Key');showBlackMarket(renderMarket)};
+  wireOwned(renderMarket);
+  $('contBtn').onclick=()=>{st.frozen=O.items.filter(o=>o.frozen&&!o.sold);nextRound()};
+  $('ovExp').onclick=()=>showExport(summaryText(),renderMarket);
+}
+function nextHTML(){const nr=st.round+1,boss=nr%20===0,elite=!boss&&nr%5===0;
+  return `<div class="next">Next: <b>Round ${nr}</b>${zoneOf(nr)!==zoneOf(st.round)?` · new zone: <b>${ZONES[zoneOf(nr)]}</b>`:''}${boss?`<br><span class="boss">Boss: ${BOSSES[(nr/20-1)%3].n}. ${BOSSES[(nr/20-1)%3].d}</span>`:elite?'<br><span class="boss">Surprise audit: a random twist</span>':''}</div>`}
+function showBlackMarket(back){
+  const pool=shuffle(CURSED.filter(c=>!has(c.id))).slice(0,3);
+  const full=st.inv.length>=st.slots;
+  showOv(`<h2>The Black Ledger</h2><div class="tag">Sign for one cursed contract, free of charge. Each is strong. Each has fine print.</div>
+   <div class="offers three">${pool.map((it,i)=>`<div class="offer">${itemCard(it,0,`<button class="buy" data-bm="${i}" type="button" ${full?'disabled':''}>${full?'Slots full':'Take it'}</button>`)}</div>`).join('')||'<div class="ds">Every page is already signed.</div>'}</div>
+   ${full?'<div class="next">Sell an item first to make room.</div>':''}${ownedHTML()}
+   <button class="chipbtn" id="bmLeave" type="button">Walk away</button>`);
+  ovCard.querySelectorAll('[data-bm]').forEach(b=>b.onclick=()=>{const it=pool[+b.dataset.bm];if(gainItem(it.id,0)){logEv('took cursed '+it.n);chord([200,150,300]);renderBar();back()}});
+  wireOwned(()=>showBlackMarket(back));
+  $('bmLeave').onclick=back;
+}
+// Cafe
+function showCafe(head,lines){
+  const menu=shuffle(FOODS.slice()).slice(0,3).map(f=>({f,price:Math.max(1,Math.round(f.p*(has('coupon')?.8:1)*(1+st.round/40))),sold:false}));
+  const render=()=>{
+    const full=st.foods.length>=st.foodSlots;
+    showOv(`${sumHTML(head,lines)}<h2 style="font-size:24px">Brimstone Canteen</h2><div class="tag">Snacks are single-use. Tap one in your tray during a round to eat it.</div>
+     <div class="offers three">${menu.map((m,i)=>`<div class="offer ${m.sold?'sold':''}"><div class="ic" style="border-color:#ffb36b;color:#ffcf9e">${m.f.n[0]}</div><div class="nm">${m.f.n}</div><div class="ds">${m.f.d}</div><button class="buy" data-f="${i}" type="button" ${!m.sold&&!full&&st.coins>=m.price?'':'disabled'}>${m.sold?'Bought':full?'Tray full':m.price+' coins'}</button></div>`).join('')}</div>
+     <div class="next">Tray: ${st.foods.map(f=>FOODS.find(x=>x.id===f).n).join(', ')||'empty'} (${st.foods.length}/${st.foodSlots}) · <b style="color:var(--gold)">${st.coins} coins</b></div>
+     ${nextHTML()}<button class="big" id="contBtn" type="button">Start round ${st.round+1}</button>`);
+    ovCard.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{const m=menu[+b.dataset.f];if(m.sold||st.coins<m.price||st.foods.length>=st.foodSlots)return;st.coins-=m.price;m.sold=true;st.foods.push(m.f.id);logEv(`bought food ${m.f.n} for ${m.price}`);blip(700,.1);render()});
+    $('contBtn').onclick=nextRound;
+  };render();
+}
+// Claw machine
+function showClaw(head,lines){
+  const prizes=Array.from({length:6},()=>{const r=rnd();
+    if(r<.38)return {k:'coins',v:3+Math.floor(rnd()*8)};
+    if(r<.6)return {k:'food',v:pick(FOODS).id};
+    if(r<.88)return {k:'item',v:(randomItem()||ITEMS[0]).id};
+    if(r<.96)return {k:'key'};return {k:'perk'}});
+  let grabs=3,pos=0,dir=1,raf=0,busy=false;const got=[];
+  const label=p=>p.k==='coins'?p.v+'c':p.k==='food'?'Snack':p.k==='item'?'Relic':p.k==='key'?'Key':'Oath';
+  showOv(`${sumHTML(head,lines)}<h2 style="font-size:24px">Soul Lottery</h2><div class="tag">Three tries. Stop the claw over a prize. It doesn't always hold on.</div>
+   <div class="claw"><div class="rail"></div><div class="hand" id="hand"><i></i><b></b></div><div class="prizes" id="prz">${prizes.map((p,i)=>`<div class="prize" data-p="${i}">?</div>`).join('')}</div></div>
+   <button class="big" id="grabBtn" type="button">Grab (3 left)</button><div class="next" id="clawMsg">&nbsp;</div>
+   <button class="chipbtn" id="contBtn" type="button">Skip to round ${st.round+1}</button>`);
+  const hand=$('hand'),prz=$('prz');
+  const tick=()=>{if(ov.hidden)return;pos+=dir*.012;if(pos>1){pos=1;dir=-1}if(pos<0){pos=0;dir=1}hand.style.left=`calc(10px + ${pos} * (100% - 20px))`;raf=requestAnimationFrame(tick)};tick();
+  $('grabBtn').onclick=()=>{
+    if(busy||grabs<=0)return;busy=true;grabs--;
+    const boxes=[...prz.children],hr=hand.getBoundingClientRect(),cx=hr.left+hr.width/2;
+    const idx=boxes.findIndex(b=>{const r=b.getBoundingClientRect();return cx>=r.left-3&&cx<=r.right+3});
+    const ok=idx>=0&&!boxes[idx].classList.contains('got')&&!boxes[idx].classList.contains('miss')&&rnd()<.68;
+    let msg='';
+    if(idx<0)msg='Nothing under the claw.';
+    else if(!ok){if(!boxes[idx].classList.contains('got'))boxes[idx].classList.add('miss');boxes[idx].textContent=label(prizes[idx]);msg='It slipped out of the claw.'}
+    else{const p=prizes[idx];boxes[idx].classList.add('got');boxes[idx].textContent=label(p);
+      if(p.k==='coins'){st.coins+=p.v;msg=`+${p.v} coins`}
+      else if(p.k==='food'){if(st.foods.length<st.foodSlots){st.foods.push(p.v);msg='Got '+FOODS.find(f=>f.id===p.v).n}else msg='Food tray full, so you left it.'}
+      else if(p.k==='item'){msg=gainItem(p.v,0)?'Got '+IT[p.v].n:'No free slot for '+IT[p.v].n}
+      else if(p.k==='key'){st.keys++;msg='Got a Ledger Key. Use it at the next Commissary.'}
+      else{const pk=shuffle(PERKS.filter(x=>!st.perks.includes(x.id)))[0];if(pk){st.perks.push(pk.id);if(pk.gain)pk.gain();msg='Perk: '+pk.n+'. '+pk.d}else{st.coins+=8;msg='+8 coins'}}
+      got.push(msg);chord([660,880,990]);renderBar();renderTray();
+    }
+    logEv('claw: '+msg);$('clawMsg').textContent=msg;
+    $('grabBtn').textContent=grabs?`Grab (${grabs} left)`:'Out of tries';$('grabBtn').disabled=!grabs;
+    if(!grabs)$('contBtn').textContent=`Start round ${st.round+1}`;
+    setTimeout(()=>busy=false,350);
+  };
+  $('contBtn').onclick=()=>{cancelAnimationFrame(raf);nextRound()};
+}
+// Perks
+function showPerkPick(head,lines,then){
+  const pool=shuffle(PERKS.filter(p=>!st.perks.includes(p.id)&&!(p.id==='pocket'&&st.slots>=7))).slice(0,3);
+  if(!pool.length)return then();
+  showOv(`${sumHTML(head,lines)}<h2 style="font-size:24px">Swear a Binding Oath</h2><div class="tag">Oaths last the whole run and can't be broken.</div>
+   <div class="offers three">${pool.map((p,i)=>`<div class="offer"><div class="ic" style="border-color:#8fe3ff;color:#bdf0ff">★</div><div class="nm">${p.n}</div><div class="ds">${p.d}</div><button class="buy" data-pk="${i}" type="button">Take</button></div>`).join('')}</div>`);
+  ovCard.querySelectorAll('[data-pk]').forEach(b=>b.onclick=()=>{const p=pool[+b.dataset.pk];st.perks.push(p.id);if(p.gain)p.gain();logEv('perk '+p.n);chord([523,784]);renderTray();renderBar();then()});
+}
+function showVictory(lines){
+  save('pegmancer.lastRun',summaryText());
+  showOv(`<div class="logo" style="font-size:46px">PROMOTED</div><div class="tag">All ${FINAL} quotas met and three demons outlasted. You are now, officially, a Pegmancer.</div>${sumHTML('Final round cleared',lines)}
+   <button class="big" id="endlessBtn" type="button">Keep working (endless)</button>
+   <div class="shoprow"><button class="chipbtn" id="expBtn" type="button">Export run summary</button><div class="spacer"></div><button class="chipbtn" id="titleBtn" type="button">Title screen</button></div>`);
+  $('endlessBtn').onclick=()=>{st.endless=true;afterRound(null,null)};
+  $('expBtn').onclick=()=>showExport(summaryText(),()=>showVictory(lines));
+  $('titleBtn').onclick=showTitle;
 }
 function gameOver(){
-  st.phase='over';
-  if(st.round-1>best.round){best.round=st.round-1;save('pegmancer.best',best)}
-  st.log.rounds.push({r:st.round,target:st.target,score:st.roundScore,won:false,dropsUsed:st.dropsMax,dropsMax:st.dropsMax,goldEarned:0,goldAfter:st.gold,boss:st.boss?st.boss.n:null});
-  st.log.ended=new Date().toISOString();
-  save('pegmancer.lastRun',summaryText());
-  showOver();
+  st.phase='over';st.log.ended=new Date().toISOString();
+  save('pegmancer.lastRun',summaryText());showOver();
 }
 function showOver(){
-  shopState=null;
-  showOv(`<h2>Out of drops</h2>
-   <div class="sum"><div><span>Reached</span><span>Round ${st.round}</span></div>
-   <div><span>Round score</span><span>${fmtInt(st.roundScore)} / ${fmtInt(st.target)}</span></div>
+  showOv(`<h2>Performance review: terminal.</h2>
+   <div class="sum"><div><span>Reached</span><span>Round ${st.round} (${ZONES[zoneOf(st.round)]})</span></div>
+   <div><span>Last round</span><span>${fmtInt(st.roundScore)} / ${fmtInt(st.tgt)}</span></div>
    <div><span>Best drop this run</span><span>${fmtInt(st.bestDrop)}</span></div>
-   <div><span>Relics</span><span>${st.relics.length}</span></div>
+   <div><span>Consignments this run</span><span>${st.restocksRun}</span></div>
    <div class="tot"><span>Best ever</span><span>Round ${best.round} · ${fmtInt(best.drop)}</span></div></div>
-   ${st.relics.length?`<div class="owned" style="justify-content:center">${st.relics.map(r=>`<span class="relic" style="border-color:${r.c};color:${r.c}" title="${r.n}">${r.g}</span>`).join('')}</div>`:''}
+   <div class="ownbar" style="justify-content:center">${st.inv.map(x=>`<span class="it"><span class="g" style="border-color:${RAR[IT[x.id].r].c};color:${RAR[IT[x.id].r].c}">${IT[x.id].g}</span><span class="x">×${x.L}</span></span>`).join('')}</div>
    <button class="big" id="againBtn" type="button">New run</button>
    <div class="shoprow"><button class="chipbtn" id="expBtn" type="button">Export run summary</button><div class="spacer"></div><button class="chipbtn" id="titleBtn" type="button">Title screen</button></div>`);
   $('againBtn').onclick=newRun;$('titleBtn').onclick=showTitle;$('expBtn').onclick=()=>showExport(summaryText(),showOver);
@@ -421,31 +754,32 @@ function showOver(){
 // ---------- run summary export ----------
 function summaryText(){
   if(!st||!st.log)return '';
-  const L=st.log,counts={};st.pegs.forEach(p=>counts[p.type]=(counts[p.type]||0)+1);
-  const ended=st.phase==='over';
-  const out=[];
-  out.push('PEGMANCER RUN SUMMARY');
-  out.push(`Version ${VERSION} · started ${L.started}${L.ended?' · ended '+L.ended:''}`);
-  out.push(ended?`Result: lost on round ${st.round} (${fmtInt(st.roundScore)} / ${fmtInt(st.target)})`:`Status: in progress, round ${st.round} (${fmtInt(st.roundScore)} / ${fmtInt(st.target)}, ${st.dropsLeft} drops left)`);
-  out.push(`Gold ${st.gold} · best drop ${fmtInt(st.bestDrop)} · all-time best round ${best.round}`);
-  out.push(`Relics (${st.relics.length}/${MAX_RELICS}): ${st.relics.map(r=>r.n).join(', ')||'none'}`);
-  out.push(`Board: ${Object.entries(counts).map(([k,v])=>k+' '+v).join(', ')}`);
-  out.push(`Upgrades: blue peg +${st.perm.lvl}, red peg +${st.perm.red}, outer buckets +${st.perm.edge}, extra drops +${st.perm.drops}`);
-  out.push('');out.push('ROUNDS');
-  const rounds=[...new Set(L.drops.map(d=>d.r).concat(L.rounds.map(r=>r.r)))].sort((a,b)=>a-b);
+  const L=st.log,counts={};st.pegs.forEach(p=>{const k=p.kind||'empty';counts[k]=(counts[k]||0)+1});
+  const o=[];
+  o.push('PEGMANCER RUN SUMMARY');
+  o.push(`Version ${VERSION} · started ${L.started}${L.ended?' · ended '+L.ended:''}`);
+  o.push(st.phase==='over'?`Result: out of lives on round ${st.round}`:`Status: round ${st.round} (${ZONES[zoneOf(st.round)]}), ${fmtInt(st.roundScore)} / ${fmtInt(st.tgt)}, ${st.dropsLeft} drops left`);
+  o.push(`Lives ${st.lives}/${st.maxLives} · coins ${st.coins} · keys ${st.keys} · restocks this run ${st.restocksRun} · best drop ${fmtInt(st.bestDrop)}`);
+  o.push(`Items (${st.inv.length}/${st.slots}, left to right): ${st.inv.map(x=>`${IT[x.id].n} ×${x.L} [fired ${x.fired||0}]`).join(', ')||'none'}`);
+  o.push(`Perks: ${st.perks.map(id=>PERKS.find(p=>p.id===id).n).join(', ')||'none'}`);
+  o.push(`Food tray: ${st.foods.map(id=>FOODS.find(f=>f.id===id).n).join(', ')||'empty'}`);
+  o.push(`Board: ${Object.entries(counts).map(([k,v])=>k+' '+v).join(', ')} · total value ${fmtInt(boardTotal())} · biggest peg ${fmtInt(maxPeg())}`);
+  o.push(`Upgrades: outer buckets +${st.perm.edge}, red pegs +${st.perm.red}`);
+  o.push('');o.push('ROUNDS');
+  const rounds=[...new Set(L.drops.map(d=>d.r).concat(L.rounds.map(r=>r.r),L.events.map(e=>e.r)))].sort((a,b)=>a-b);
   for(const r of rounds){
     const R=L.rounds.find(x=>x.r===r);
-    out.push(R?`Round ${r}${R.boss?' [boss: '+R.boss+']':''}: ${fmtInt(R.score)} / ${fmtInt(R.target)} in ${R.dropsUsed}/${R.dropsMax} drops, ${R.won?'won, +'+R.goldEarned+' gold':'LOST'}`:`Round ${r}: in progress`);
-    L.drops.filter(d=>d.r===r).forEach(d=>out.push(`  drop ${d.d}: ${d.pts} pts × ${d.mult} mult × ${d.bucket} bucket = ${fmtInt(d.score)} (${d.hits} hits)${d.tags.length?' ['+d.tags.join(', ')+']':''}`));
-    L.shop.filter(s=>s.r===r).forEach(s=>out.push(`  shop: ${s.act==='reroll'?'reroll ('+s.price+'g)':s.act+' '+s.name+' ('+s.price+'g)'}`));
+    o.push(R?`Round ${r}${R.mod?' ['+R.mod+']':''}: ${fmtInt(R.score)} / ${fmtInt(R.target)} in ${R.dropsUsed}/${R.dropsMax} drops, ${R.won?'won':'MISSED'}, ${R.restocks} restocks, coins after ${R.coinsAfter}, lives ${R.lives}`:`Round ${r}: in progress`);
+    L.drops.filter(d=>d.r===r).forEach(d=>o.push(`  drop ${d.d}: ${fmt(d.pts)} pts × ${fmt(d.mult)} mult × ${fmt(d.bucket)} = ${fmtInt(d.score)} (${d.hits} hits, ${d.pops} pops, angle ${d.ang}°)${d.tags.length?' ['+d.tags.join(', ')+']':''}`));
+    L.events.filter(e=>e.r===r).forEach(e=>o.push('  · '+e.e));
   }
-  out.push('');out.push('DATA (for changes)');
-  out.push(JSON.stringify({v:VERSION,round:st.round,gold:st.gold,relics:st.relics.map(r=>r.id),perm:st.perm,pegs:counts,rounds:L.rounds,drops:L.drops.map(d=>[d.r,d.d,d.pts,d.mult,d.bucket,d.hits,d.score]),shop:L.shop}));
-  return out.join('\n');
+  o.push('');o.push('DATA (for changes)');
+  o.push(JSON.stringify({v:VERSION,round:st.round,lives:st.lives,coins:st.coins,inv:st.inv.map(x=>[x.id,x.L,x.fired||0]),perks:st.perks,foods:st.foods,specials:st.specials,perm:st.perm,board:counts,rounds:L.rounds,drops:L.drops.map(d=>[d.r,d.d,d.pts,d.mult,d.bucket,d.hits,d.pops,d.score])}));
+  return o.join('\n');
 }
 let exportBack=null;
 function showExport(text,back){
-  exportBack=back;shopState=null;
+  exportBack=back;
   showOv(`<h2>Run summary</h2>
    <div class="tag">Copy or share this and paste it into a chat with Claude to ask for balance changes or new features.</div>
    <textarea id="expText" readonly style="width:100%;height:46vh;background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:12px;padding:10px;font:12px/1.45 ui-monospace,Consolas,monospace;resize:vertical;-webkit-user-select:text;user-select:text"></textarea>
@@ -460,40 +794,74 @@ function showExport(text,back){
   const sh=$('shareBtn');if(sh)sh.onclick=()=>{try{APPB.share(ta.value)}catch(e){}};
   $('expBack').onclick=()=>{const b=exportBack;exportBack=null;b?b():hideOv()};
 }
-// Android back button: close the export or go back to the title
+$('hudExp').onclick=()=>{if(st&&st.log&&ov.hidden)showExport(summaryText(),hideOv)};
 window.pegmancerBack=()=>{
   if(exportBack){const b=exportBack;exportBack=null;b();return true}
-  if(shopState)return true;
-  if(st&&st.log&&(st.phase==='aim'||st.phase==='falling')&&ov.hidden){showExport(summaryText(),hideOv);return true}
+  if(!ov.hidden&&st&&st.log&&st.phase!=='over')return true;
+  if(st&&st.log&&(st.phase==='aim'||st.phase==='falling')){showExport(summaryText(),hideOv);return true}
   return false;
 };
 
-// ---------- HUD ----------
+// ---------- HUD, item bar, tray ----------
 function setLive(h){$('live').innerHTML=h}
 let hudKey='';
 function updateHud(){
   if(!st)return;
-  const k=[st.round,st.target,st.gold,st.roundScore,st.dropsLeft,st.dropsMax,st.boss&&st.boss.id].join('|');
+  const k=[st.round,st.tgt,st.coins,st.roundScore,st.dropsLeft,st.dropsMax,st.lives,st.maxLives,st.mod&&st.mod.id,st.quotaHit,st.phase].join('|');
   if(k===hudKey)return;hudKey=k;
-  $('hRound').textContent=st.round;$('hTarget').textContent=fmtInt(st.target);$('hGold').textContent=st.gold;
-  $('hScore').textContent=fmtInt(st.roundScore)+' / '+fmtInt(st.target);
-  $('hBar').style.width=Math.min(100,st.roundScore/st.target*100)+'%';
-  let d='<span>Drops</span>';for(let i=0;i<st.dropsMax;i++)d+=`<span class="dot ${i<st.dropsMax-st.dropsLeft?'used':''}"></span>`;
-  $('hDrops').innerHTML=d;
-  $('hBoss').textContent=st.boss?'Boss: '+st.boss.n+'. '+st.boss.d:'';
+  $('hRound').textContent=st.round+(st.endless?'':'/'+FINAL);$('hTarget').textContent=fmtInt(st.tgt);$('hGold').textContent=fmt(st.coins);
+  $('hLives').textContent='♥'.repeat(Math.max(0,st.lives))+'♡'.repeat(Math.max(0,st.maxLives-st.lives));
+  const ratio=st.tgt?st.roundScore/st.tgt:0;
+  $('hScore').textContent=fmtInt(st.roundScore)+' / '+fmtInt(st.tgt)+(ratio>=1?`  (×${fmt(Math.floor(ratio*10)/10)})`:'');
+  $('hBar').style.width=Math.min(100,ratio*100)+'%';$('hBar').classList.toggle('over',ratio>=1);
+  let d='<span>Souls</span>';for(let i=0;i<st.dropsMax;i++)d+=`<span class="dot ${i<st.dropsMax-st.dropsLeft?'used':''}"></span>`;
+  $('hDrops').innerHTML=d;$('hZone').textContent=st.log?ZONES[zoneOf(st.round)]:'';
+  $('hMod').textContent=st.mod?(st.mod.boss?'BOSS: ':'Audit: ')+st.mod.n+'. '+st.mod.d:'';
+  $('bankBtn').hidden=!(st.quotaHit&&st.phase==='aim'&&st.dropsLeft>0);
+  $('bankBtn').textContent=`End round (+${st.dropsLeft*2}c)`;
 }
-function renderRelics(){
-  const el=$('relics');let h='';
-  for(let i=0;i<MAX_RELICS;i++){const r=st&&st.relics[i];
-    h+=r?`<button class="relic" type="button" data-r="${i}" style="border-color:${r.c};color:${r.c}" aria-label="${r.n}">${r.g}</button>`:'<span class="relic empty"></span>'}
+$('bankBtn').onclick=()=>{if(st&&st.quotaHit&&st.phase==='aim')endRound()};
+function renderBar(){
+  const el=$('itemBar');if(!st||!st.inv){el.innerHTML='';return}
+  let h='';
+  st.inv.forEach((x,i)=>{const it=IT[x.id],c=RAR[it.r].c;
+    h+=`<button class="it ${sel&&sel.t==='item'&&sel.i===i?'sel':''}" type="button" data-i="${i}" title="${esc(it.n)}"><span class="g" style="border-color:${c};color:${c}">${it.g}</span><span class="t"><span>${esc(it.n)}</span><small>${firedLabel(x)}</small></span><span class="x">×${x.L}</span></button>`});
+  for(let i=st.inv.length;i<st.slots;i++)h+='<span class="it empty">+</span>';
+  for(let i=st.slots;i<7;i++)h+='<span class="it locked">Locked</span>';
   el.innerHTML=h;
-  el.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{const r=st.relics[+b.dataset.r];selRelic=selRelic===r?null:r;renderInfo()});
+  el.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{const i=+b.dataset.i;sel=sel&&sel.t==='item'&&sel.i===i?null:{t:'item',i};renderBar();renderInfo()});
+  barEls=[...el.querySelectorAll('[data-i]')];
+}
+let barEls=[],firedShown=[];
+const firedLabel=x=>fmt(x.fired||0)+' fired'+(x.burn!=null?` · ${x.burn} rd${x.burn>1?'s':''} left`:'');
+function tickBar(t){
+  if(!st||!st.inv)return;
+  barEls.forEach((b,i)=>{const on=t-(flashT[i]||0)<160;if(b.classList.contains('fire')!==on)b.classList.toggle('fire',on);
+    const x=st.inv[i];if(x&&firedShown[i]!==x.fired){firedShown[i]=x.fired;const s=b.querySelector('small');if(s)s.textContent=firedLabel(x)}});
+}
+function renderTray(){
+  const el=$('tray');if(!st||!st.foods){el.innerHTML='';renderInfo();return}
+  let h='';
+  for(let i=0;i<st.foodSlots;i++){const f=st.foods[i];h+=f?`<button class="food" type="button" data-f="${i}">${FOODS.find(x=>x.id===f).n}</button>`:'<span class="food empty">snack</span>'}
+  if(st.perks.length)h+='<span class="sep"></span>'+st.perks.map((id,i)=>`<button class="perk" type="button" data-p="${i}">★ ${PERKS.find(p=>p.id===id).n}</button>`).join('');
+  if(st.keys)h+=`<span class="key">⚿ ${st.keys}</span>`;
+  el.innerHTML=h;
+  el.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{const i=+b.dataset.f;sel=sel&&sel.t==='food'&&sel.i===i?null:{t:'food',i};renderInfo()});
+  el.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{const i=+b.dataset.p;sel=sel&&sel.t==='perk'&&sel.i===i?null:{t:'perk',i};renderInfo()});
   renderInfo();
 }
 function renderInfo(){
   const el=$('info');
-  if(selRelic&&st.relics.includes(selRelic)){el.innerHTML=`<span><b>${selRelic.n}</b> ${selRelic.d}</span><button class="sellbtn" id="sellInfo" type="button">Sell ${Math.floor(RAR[selRelic.r].p/2)}g</button>`;$('sellInfo').onclick=()=>sellRelic(selRelic)}
-  else el.innerHTML=st&&st.relics.length?'Tap a relic to see what it does':'Relics you buy show up here';
+  if(sel&&sel.t==='item'&&st.inv[sel.i]){const x=st.inv[sel.i],it=IT[x.id];
+    el.innerHTML=`<span><b>${it.n} ×${x.L}</b> <span style="color:var(--gold)">${trigText(it)}:</span> ${it.d(x.L)}</span>`+(st.phase==='aim'?`<button class="mvbtn" id="iL" type="button">◀</button><button class="mvbtn" id="iR" type="button">▶</button><button class="sellbtn" id="iS" type="button">Sell ${sellValue(x)}c</button>`:'');
+    const l=$('iL');if(l){l.onclick=()=>{moveItem(sel.i,-1);renderInfo()};$('iR').onclick=()=>{moveItem(sel.i,1);renderInfo()};$('iS').onclick=()=>{sellItem(sel.i);sel=null;renderInfo()}}
+  }else if(sel&&sel.t==='food'&&st.foods[sel.i]){const f=FOODS.find(x=>x.id===st.foods[sel.i]);
+    el.innerHTML=`<span><b>${f.n}</b> ${f.d}</span>`+(st.phase==='aim'?'<button class="usebtn" id="eat" type="button">Eat</button>':'<span>(between drops)</span>');
+    const e=$('eat');if(e)e.onclick=()=>{const i=sel.i;const r=f.use();if(r===false){el.innerHTML=`<span>${f.n} would do nothing right now.</span>`;return}st.foods.splice(i,1);logEv('ate '+f.n);sel=null;popup(W/2,H/2,f.n+'!','#ffcf9e',20);blip(600,.15,'sine');
+      if(st.quotaHit||st.roundScore>=st.tgt){const earned=Math.min(500,Math.floor(st.roundScore/st.tgt))-st.restocksRound;if(earned>0)restock(earned)}
+      renderTray();renderBar()};
+  }else if(sel&&sel.t==='perk'){const p=PERKS.find(x=>x.id===st.perks[sel.i]);el.innerHTML=`<span><b>★ ${p.n}</b> ${p.d}</span>`}
+  else el.innerHTML=st&&st.inv&&st.inv.length?'Tap a relic, snack or oath to see what it does':'Relics you buy show up above the board';
 }
 
 // ---------- physics ----------
@@ -504,27 +872,28 @@ function collide(b,p,pr,r){
   b.x=p.x+nx*rr;b.y=p.y+ny*rr;
   const vn=b.vx*nx+b.vy*ny;
   if(vn<0){
-    const e=p.type==='bumper'?1.25:.5;
-    b.vx-=(1+e)*vn*nx;b.vy-=(1+e)*vn*ny;
-    b.vx+=(rnd()-.5)*24;
+    const e=p.kind==='bumper'?1.25:.5;
+    b.vx-=(1+e)*vn*nx;b.vy-=(1+e)*vn*ny;b.vx+=(rnd()-.5)*24;
     if(Math.abs(nx)<.08)b.vx+=(rnd()<.5?-1:1)*40;
-    if(p.type==='bumper'){b.vy-=40}
+    if(p.kind==='bumper')b.vy-=40;
   }
   return true;
 }
+const posts=[];for(let i=1;i<NB;i++)posts.push({x:i*BW,y:BT,kind:'post'});
+const pegR=p=>p.kind==='num'?8+Math.min(4,Math.log2(p.v+1)*.6):8;
 function step(dt){
-  const g=gravity(),r=ballR(),lode=has('lode');
+  const g=gravity(),r=ballR(),mag=has('magnet');
+  let big=null;if(mag){let m=0;for(const p of st.pegs)if(p.kind==='num'&&p.v>m){m=p.v;big=p}}
   for(const b of balls){
     if(!b.alive)continue;
     b.t+=dt;b.vy+=g*dt;
-    if(lode)for(const p of st.pegs){if(p.type!=='mult'||p.off)continue;const dx=p.x-b.x,dy=p.y-b.y,d=Math.hypot(dx,dy);if(d<80&&d>1){const a=520*(1-d/80);b.vx+=dx/d*a*dt;b.vy+=dy/d*a*dt*.4}}
+    if(big){const dx=big.x-b.x,dy=big.y-b.y,d=Math.hypot(dx,dy);if(d>1&&d<160){b.vx+=dx/d*260*dt}}
     const sp=Math.hypot(b.vx,b.vy);if(sp>950){b.vx*=950/sp;b.vy*=950/sp}
     b.x+=b.vx*dt;b.y+=b.vy*dt;
     if(b.x<r){b.x=r;b.vx=Math.abs(b.vx)*.7;wallHit(b)}
     if(b.x>W-r){b.x=W-r;b.vx=-Math.abs(b.vx)*.7;wallHit(b)}
-    if(b.y<BT){
-      for(const p of st.pegs){if(p.off)continue;if(collide(b,p,PR,r))hitPeg(p,b)}
-    }
+    if(b.y<r&&b.vy<0){b.y=r;b.vy=Math.abs(b.vy)*.5}
+    if(b.y<BT){for(const p of st.pegs){if(!p.kind||p.off)continue;if(collide(b,p,pegR(p),r))hitPeg(p,b)}}
     for(const p of posts)collide(b,p,4,r);
     if(b.y>=BT){
       if(b.bin<0)b.bin=Math.max(0,Math.min(NB-1,Math.floor(b.x/BW)));
@@ -536,23 +905,29 @@ function step(dt){
     if(b.y>H-r-2||b.t>25)landBall(b);
   }
 }
-function wallHit(b){if(has('rubber')&&D&&(!b.lastWall||b.t-b.lastWall>.15)){b.lastWall=b.t;D.points+=3;popup(b.x<W/2?18:W-18,b.y,'+3',COL.good,12)}}
+function wallHit(b){
+  if(!D||b.t-b.lastWall<.15)return;b.lastWall=b.t;D.walls++;
+  const c={ball:b};fire('wall',c);fireEvery('wallN',D.walls,c);
+  if(hasPerk('rebound'))forceTrigger('last',1,c);
+}
 
-// ---------- input ----------
-function boardX(e){const rc=cv.getBoundingClientRect();return (e.clientX-rc.left)/scale}
+// ---------- input: drag along the top for position, drag down for angle ----------
+function boardPt(e){const rc=cv.getBoundingClientRect();return {x:(e.clientX-rc.left)/scale,y:(e.clientY-rc.top)/scale}}
+function aimFrom(pt){
+  if(pt.y<DROP_Y+24){aimX=Math.max(12,Math.min(W-12,pt.x))}
+  else{const dx=pt.x-aimX,dy=pt.y-DROP_Y;aimAng=Math.max(-MAX_ANG,Math.min(MAX_ANG,Math.atan2(dx,dy)));if(Math.abs(aimAng)<.05)aimAng=0}
+}
 cv.addEventListener('pointerdown',e=>{
-  initAudio();if(!st)return;const x=boardX(e);
-  if(st.phase==='aim'){pressing=true;aimX=Math.max(12,Math.min(W-12,x));cv.setPointerCapture&&cv.setPointerCapture(e.pointerId)}
-  else if(st.phase==='falling'&&st.nudges>0){
-    const live=balls.filter(b=>b.alive);if(!live.length)return;
-    const ref=live.reduce((a,b)=>a+b.x,0)/live.length;const dir=x<ref?-1:1;
-    live.forEach(b=>{b.vx+=dir*200;b.vy=Math.min(b.vy,b.vy*.6)});st.nudges--;popup(ref,live[0].y-16,dir<0?'←':'→',COL.splitter,18);blip(600,.06,'sine');
-  }
+  initAudio();if(!st||!st.log||st.phase!=='aim')return;
+  dragging=true;const pt=boardPt(e);aimFrom(pt);anchor=pt;chargeStart=performance.now();cv.setPointerCapture&&cv.setPointerCapture(e.pointerId);
 });
-cv.addEventListener('pointermove',e=>{if(st&&st.phase==='aim'&&(pressing||e.pointerType==='mouse'))aimX=Math.max(12,Math.min(W-12,boardX(e)))});
-cv.addEventListener('pointerup',e=>{if(pressing&&st&&st.phase==='aim'){pressing=false;tryDrop()}pressing=false});
-cv.addEventListener('pointercancel',()=>pressing=false);
-window.addEventListener('keydown',e=>{if(!st||!ov.hidden)return;if(e.key==='ArrowLeft')aimX=Math.max(12,aimX-10);if(e.key==='ArrowRight')aimX=Math.min(W-12,aimX+10);if(e.key===' '||e.key==='Enter'){e.preventDefault();tryDrop()}});
+cv.addEventListener('pointermove',e=>{if(st&&st.phase==='aim'&&dragging){const pt=boardPt(e);aimFrom(pt);if(!anchor||Math.hypot(pt.x-anchor.x,pt.y-anchor.y)>5){anchor=pt;chargeStart=performance.now()}}});
+cv.addEventListener('pointerup',()=>{if(dragging&&st&&st.phase==='aim'){const ch=chargeNow();dragging=false;tryDrop(ch)}dragging=false});
+cv.addEventListener('pointercancel',()=>dragging=false);
+window.addEventListener('keydown',e=>{if(!st||!st.log||!ov.hidden||st.phase!=='aim')return;
+  if(e.key==='ArrowLeft')aimX=Math.max(12,aimX-8);if(e.key==='ArrowRight')aimX=Math.min(W-12,aimX+8);
+  if(e.key==='q'||e.key==='Q')aimAng=Math.min(MAX_ANG,aimAng+.05);if(e.key==='e'||e.key==='E')aimAng=Math.max(-MAX_ANG,aimAng-.05);
+  if(e.key===' '||e.key==='Enter'){e.preventDefault();tryDrop()}});
 
 // ---------- render ----------
 function resize(){
@@ -563,78 +938,102 @@ function resize(){
 }
 new ResizeObserver(resize).observe(stage);
 function circle(x,y,r){ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2)}
+function drawSoul(x,y,r,hot,speed,t){
+  ctx.fillStyle=hot?'#ff8a3d':'#e9eefc';ctx.shadowColor=hot?'#ff6a00':'#cfe0ff';ctx.shadowBlur=hot?18:10;circle(x,y,r);ctx.fill();ctx.shadowBlur=0;
+  ctx.fillStyle=hot?'#4a0e00':'#2a1630';
+  const ey=y-r*.18;circle(x-r*.35,ey,r*.15);ctx.fill();circle(x+r*.35,ey,r*.15);ctx.fill();
+  if(speed>300||hot){ctx.beginPath();ctx.ellipse(x,y+r*.38,r*.2,r*.26,0,0,Math.PI*2);ctx.fill()}
+  else{ctx.fillRect(x-r*.25,y+r*.35,r*.5,Math.max(1,r*.12))}
+}
+const ZONE_BG=[['#2a0d0a','#120504'],['#3d1406','#170603'],['#2a241c','#0f0d0a'],['#22082c','#08020c']];
+function numColor(v){const t=Math.min(1,Math.log2(v+1)/12);const h=4+t*52,l=42+t*30;return `hsl(${h},95%,${l}%)`}
 function draw(t){
   ctx.save();
-  if(shake>0){ctx.translate((rnd()-.5)*shake,(rnd()-.5)*shake)}
-  const bg=ctx.createLinearGradient(0,0,0,H);bg.addColorStop(0,'#1d1745');bg.addColorStop(1,'#120e28');
+  if(shake>0)ctx.translate((rnd()-.5)*shake,(rnd()-.5)*shake);
+  const zc=ZONE_BG[st&&st.log?zoneOf(st.round):0];
+  const bg=ctx.createLinearGradient(0,0,0,H);bg.addColorStop(0,zc[0]);bg.addColorStop(1,zc[1]);
   ctx.fillStyle=bg;ctx.fillRect(-10,-10,W+20,H+20);
-  ctx.strokeStyle='#ffffff08';ctx.lineWidth=1;
-  for(let x=25;x<W;x+=25){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}
-  // drop rail
-  ctx.fillStyle='#2a2354';ctx.fillRect(0,DROP_Y-16,W,32);
-  ctx.fillStyle='#a69dd3';ctx.font='800 10px Nunito, sans-serif';ctx.textAlign='left';ctx.fillText('DROP ZONE',8,DROP_Y-20);
-  if(st&&st.phase==='aim'){
-    ctx.setLineDash([4,6]);ctx.strokeStyle='#ffffff40';ctx.beginPath();ctx.moveTo(aimX,DROP_Y);ctx.lineTo(aimX,120);ctx.stroke();ctx.setLineDash([]);
-    const bob=Math.sin(t/220)*2;ctx.fillStyle='#fff';ctx.shadowColor='#fff';ctx.shadowBlur=12;circle(aimX,DROP_Y+bob,ballR());ctx.fill();ctx.shadowBlur=0;
-    if(has('twin')&&(st.dropNo+1)%3===0){ctx.fillStyle='#2de2c8';ctx.font='800 11px Nunito, sans-serif';ctx.textAlign='center';ctx.fillText('TWIN',aimX,DROP_Y-20)}
+  ctx.strokeStyle='#ffffff08';ctx.lineWidth=1;for(let x=25;x<W;x+=25){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}
+  ctx.fillStyle='#ffffff0d';ctx.fillRect(0,DROP_Y-18,W,36);
+  ctx.fillStyle='#c59a87';ctx.font='800 9px Nunito, sans-serif';ctx.textAlign='left';ctx.fillText('SOUL CHUTE · DRAG TO MOVE · DRAG DOWN TO ANGLE · HOLD TO CHARGE',8,DROP_Y-22);
+  if(st&&st.phase==='aim'&&st.log){
+    // trajectory guide
+    const vx=Math.sin(aimAng)*LAUNCH,vy=Math.cos(aimAng)*LAUNCH*.6,g=gravity();
+    ctx.fillStyle='#ffffff55';
+    for(let i=1;i<14;i++){const tt=i*.035,x=aimX+vx*tt,y=DROP_Y+vy*tt+.5*g*tt*tt;if(y>BT)break;circle(Math.max(4,Math.min(W-4,x)),y,2.2-i*.1);ctx.fill()}
+    const bob=Math.sin(t/220)*2,ch=chargeNow();drawSoul(aimX,DROP_Y+bob,ballR(),ch>=1,0,t);
+    if(ch>0){ctx.strokeStyle=ch>=1?'#ff6a00':'#ffb02e';ctx.lineWidth=3;ctx.beginPath();ctx.arc(aimX,DROP_Y+bob,ballR()+6,-Math.PI/2,-Math.PI/2+Math.PI*2*ch);ctx.stroke();
+      if(ch>=1){ctx.fillStyle='#ff6a00';ctx.font='800 10px Nunito, sans-serif';ctx.textAlign='center';ctx.fillText('HELLFIRE READY',aimX,DROP_Y+ballR()+20)}}
+    if(aimAng){ctx.fillStyle='#ffc93c';ctx.font='800 11px Nunito, sans-serif';ctx.textAlign='center';ctx.fillText(Math.round(-aimAng*57.3)+'°',aimX,DROP_Y-6-ballR())}
   }
   // pegs
-  if(st)for(const p of st.pegs){
-    if(p.off){ctx.strokeStyle='#4a3f86';ctx.lineWidth=1.5;circle(p.x,p.y,PR-1);ctx.stroke();ctx.beginPath();ctx.moveTo(p.x-4,p.y-4);ctx.lineTo(p.x+4,p.y+4);ctx.stroke();continue}
-    const c=COL[p.type],dim=(p.type==='bomb'&&p.spent)||((p.type==='splitter'||p.type==='crit')&&p.used);
-    ctx.globalAlpha=dim?.3:1;
-    if(p.type!=='basic'||p.flash>0){ctx.shadowColor=c;ctx.shadowBlur=p.type==='basic'?14*p.flash:8+12*p.flash}
-    ctx.fillStyle=c;circle(p.x,p.y,PR*(1+.35*p.flash));ctx.fill();ctx.shadowBlur=0;
-    ctx.fillStyle='#ffffff70';circle(p.x-2,p.y-2,2.2);ctx.fill();
-    if(p.type==='bumper'){ctx.strokeStyle='#e4cfff';ctx.lineWidth=1.5;circle(p.x,p.y,PR+3);ctx.stroke()}
-    if(p.type==='crit'){ctx.fillStyle='#5b1748';ctx.font='900 8px Nunito, sans-serif';ctx.textAlign='center';ctx.fillText('×',p.x,p.y+3)}
-    ctx.globalAlpha=1;
+  if(st&&st.pegs)for(const p of st.pegs){
+    if(!p.kind){continue}
+    if(p.off){ctx.strokeStyle='#5a2318';ctx.lineWidth=1.5;circle(p.x,p.y,7);ctx.stroke();ctx.beginPath();ctx.moveTo(p.x-4,p.y-4);ctx.lineTo(p.x+4,p.y+4);ctx.stroke();continue}
+    const r=pegR(p);
+    if(p.kind==='num'){
+      const c=numColor(p.v);
+      if(p.flash>0){ctx.shadowColor=c;ctx.shadowBlur=14*p.flash}
+      const rr=r*(1+.3*p.flash);ctx.fillStyle=c;circle(p.x,p.y,rr);ctx.fill();ctx.shadowBlur=0;
+      ctx.beginPath();for(let k=0;k<6;k++){const a=k*Math.PI/3+.3,a1=a-.22,a2=a+.22;ctx.moveTo(p.x+Math.cos(a1)*rr*.92,p.y+Math.sin(a1)*rr*.92);ctx.lineTo(p.x+Math.cos(a)*(rr+3.2),p.y+Math.sin(a)*(rr+3.2));ctx.lineTo(p.x+Math.cos(a2)*rr*.92,p.y+Math.sin(a2)*rr*.92)}ctx.fill();
+      ctx.fillStyle=Math.log2(p.v+1)<4?'#fff3e6':'#2a0800';const s=fmt(p.v);ctx.font=`900 ${s.length>3?7:s.length>2?8:9.5}px Nunito, sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(s,p.x,p.y+.5);ctx.textBaseline='alphabetic';
+    }else{
+      const c=SPECIAL[p.kind],dim=(p.kind==='bomb'&&p.spent)||((p.kind==='splitter'||p.kind==='crit')&&p.used);
+      ctx.globalAlpha=dim?.3:1;ctx.shadowColor=c;ctx.shadowBlur=8+12*p.flash;
+      const dr=r*1.25*(1+.3*p.flash);ctx.fillStyle=c;ctx.beginPath();ctx.moveTo(p.x,p.y-dr);ctx.lineTo(p.x+dr,p.y);ctx.lineTo(p.x,p.y+dr);ctx.lineTo(p.x-dr,p.y);ctx.closePath();ctx.fill();ctx.shadowBlur=0;
+      if(p.kind==='bumper'){ctx.strokeStyle='#e4cfff';ctx.lineWidth=1.5;circle(p.x,p.y,r+3);ctx.stroke()}
+      ctx.fillStyle='#1a0500';ctx.font='900 10px Nunito, sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(SPECIAL_GLYPH[p.kind],p.x,p.y+.5);ctx.textBaseline='alphabetic';
+      ctx.globalAlpha=1;
+    }
     p.flash=Math.max(0,p.flash-.06);
   }
+  // blasts
+  for(const b of blasts){ctx.strokeStyle=`rgba(255,138,61,${1-b.t})`;ctx.lineWidth=3;circle(b.x,b.y,b.r*(.4+.6*b.t));ctx.stroke()}
   // buckets
-  if(st)for(let i=0;i<NB;i++){
+  if(st&&st.log)for(let i=0;i<NB;i++){
     const x=i*BW,m=bucketMult(i),f=bucketFlash[i];
     const hot=m>=4?'#ffc93c':m>=2?'#ff4d6d':m>=1.5?'#b26bff':'#5aa9ff';
     ctx.fillStyle=hot+(f>0?'aa':'33');ctx.fillRect(x+2,BT,BW-4,H-BT);
     ctx.fillStyle=f>0?'#fff':hot;ctx.font='22px "Lilita One", sans-serif';ctx.textAlign='center';ctx.fillText('×'+fmt(m),x+BW/2,BT+38);
     bucketFlash[i]=Math.max(0,f-.03);
   }
-  ctx.fillStyle='#4a3f86';for(const p of posts){ctx.fillRect(p.x-2,BT,4,H-BT);circle(p.x,p.y,4);ctx.fill()}
+  ctx.fillStyle='#5a2318';for(const p of posts){ctx.fillRect(p.x-2,BT,4,H-BT);circle(p.x,p.y,4);ctx.fill()}
   // balls
-  const r=st?ballR():BASE_R;
+  const r=ballR();
   for(const b of balls){
     if(!b.alive)continue;
     b.trail.push(b.x,b.y);if(b.trail.length>16)b.trail.splice(0,2);
-    for(let i=0;i<b.trail.length;i+=2){ctx.fillStyle=`rgba(200,190,255,${i/b.trail.length*.35})`;circle(b.trail[i],b.trail[i+1],r*(i/b.trail.length));ctx.fill()}
-    ctx.fillStyle='#fff';ctx.shadowColor='#fff';ctx.shadowBlur=10;circle(b.x,b.y,r);ctx.fill();ctx.shadowBlur=0;
+    for(let i=0;i<b.trail.length;i+=2){ctx.fillStyle=`rgba(255,170,120,${i/b.trail.length*.35})`;circle(b.trail[i],b.trail[i+1],r*(i/b.trail.length));ctx.fill()}
+    drawSoul(b.x,b.y,r,b.fire>0,Math.hypot(b.vx,b.vy),t);
   }
   // popups
   ctx.textAlign='center';
   for(const p of pops){
-    const a=1-p.t/1;ctx.globalAlpha=Math.max(0,a);ctx.fillStyle=p.color;
-    ctx.font=(p.size>=20?'':'800 ')+p.size+'px '+(p.size>=20?'"Lilita One", sans-serif':'Nunito, sans-serif');
-    ctx.strokeStyle='#120e28';ctx.lineWidth=p.size>=20?5:3;ctx.strokeText(p.text,p.x,p.y-p.t*28);ctx.fillText(p.text,p.x,p.y-p.t*28);
+    ctx.globalAlpha=Math.max(0,1-p.t);ctx.fillStyle=p.color;
+    ctx.font=(p.size>=18?'':'800 ')+p.size+'px '+(p.size>=18?'"Lilita One", sans-serif':'Nunito, sans-serif');
+    ctx.strokeStyle='#140806';ctx.lineWidth=p.size>=18?5:3;ctx.strokeText(p.text,p.x,p.y-p.t*28);ctx.fillText(p.text,p.x,p.y-p.t*28);
   }
   ctx.globalAlpha=1;ctx.restore();
 }
 let last=performance.now();
 function frame(t){
-  let dt=Math.min(.033,(t-last)/1000);last=t;
-  if(st&&st.phase==='falling'||(st&&balls.some(b=>b.alive))){
-    const n=5;for(let i=0;i<n;i++)step(dt/n);
+  const dt=Math.min(.033,(t-last)/1000);last=t;
+  if(st&&st.log&&(st.phase==='falling'||balls.some(b=>b.alive))){
+    for(let i=0;i<5;i++)step(dt/5);
     if(st.phase==='falling'&&D){
-      const live=balls.some(b=>b.alive);
-      if(live)setLive(`<span>${fmt(D.points)}</span> <span class="x">× ${fmt(D.mult)}</span> <small>${D.hits} hits${st.nudges?` · ${st.nudges} nudges`:''}</small>`);
+      if(balls.some(b=>b.alive))setLive(`<span>${fmt(D.points)}</span> <span class="x">× ${fmt(D.mult)}</span> <small>${D.hits} hits · ${D.pops} pops</small>`);
       else{balls=[];finishDrop()}
     }
   }
   pops.forEach(p=>p.t+=dt*.9);pops=pops.filter(p=>p.t<1);
+  blasts.forEach(b=>b.t+=dt*2.5);for(let i=blasts.length-1;i>=0;i--)if(blasts[i].t>=1)blasts.splice(i,1);
   shake=Math.max(0,shake-dt*30);
-  draw(t);updateHud();
+  draw(t);updateHud();tickBar(t);
   requestAnimationFrame(frame);
 }
-// demo board behind title
-st={round:1,gold:0,relics:[],pegs:buildPegs(),perm:{lvl:0,red:0,edge:0,drops:0},boss:null,nextBoss:BOSSES[0],dropsLeft:5,dropsMax:5,dropNo:0,roundScore:0,target:target(1),phase:'title',bestDrop:0};
-renderRelics();resize();showTitle();requestAnimationFrame(frame);
+// demo board behind the title screen
+st={round:1,coins:0,lives:3,maxLives:3,inv:null,specials:{mult:5,gold:3,bumper:1},perm:{edge:0,red:0},pegs:[],mod:null,dropsLeft:5,dropsMax:5,roundScore:0,tgt:0,phase:'title'};
+buildBoard();
+renderBar();renderTray();resize();showTitle();requestAnimationFrame(frame);
 })();
 </script>

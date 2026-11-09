@@ -1,16 +1,19 @@
 # Pegmancer
 
-A plinko-style roguelike. Drop balls through a board of pegs, score **points × mult × bucket**, and beat each round's target before you run out of drops. Spend gold between rounds on relics and board upgrades to build a combo that keeps up with the rising targets.
+A darkly comic plinko roguelike. You are a devil intern launching damned souls down the Boards of Torment. Torment pegs give their value in suffering, then halve and pop. Overshoot quota and fresh consignments of the damned arrive, fusing into greater sinners. Build absurd combos from triggered relics before the Infernal Auditor unmakes you.
 
 ## Features
 
-- 36 relics (common, uncommon and rare) that change scoring, physics, gold and the shop.
-- 10 board upgrades: sharpen pegs, add red, gold, bumper, splitter, crit and bomb pegs, bigger outer buckets, extra drops.
-- 7 peg types and 7 buckets with different multipliers.
-- A boss round every 4th round, with a twist such as heavy gravity, tight buckets or a blackout.
-- Shop rerolls, selling relics, interest on saved gold.
-- **Run summary export**: copy or share a summary of a run (every drop, round, purchase and the final build) so you can send it in for balance changes.
-- **Update** button on the title screen. The app also checks GitHub when it starts and downloads a new version only if you say yes.
+- **Aim, angle and charge**: drag along the chute to pick a spot, drag down to tilt the angle, hold still to charge a Hellfire soul.
+- **Torment pegs** worth powers of 2. Each hit scores the value, then halves it. At 0 the peg pops. Purge the board for ×2.
+- **Consignments**: every time your round total passes quota again, empty slots refill and matching neighbours merge. Each one pays a coin.
+- **Suffering × mult × bucket** scoring, with sigil pegs for mult, coins, bounce, splits, crits and blasts.
+- **47 relics** with triggers (on hit, on pop, every N pops, on wall, on landing, on quota, on consignment…) that fire left to right. Slot order matters, including the Amplifier and Mirror. Duplicates level up to ×3. Temporary relics burn out after a few rounds.
+- **Up to 7 relic shelves**, plus 12 Binding Oaths that force-trigger relics, and single-use snacks.
+- **Infernal Commissary** (freeze, reroll, board upgrades, extra shelves), **Brimstone Canteen**, **Soul Lottery** claw machine, and the **Black Ledger** of cursed contracts (needs a Ledger Key).
+- 60 rounds across four Departments of Hell, surprise audits every 5 rounds, and a boss every 20 who sabotages your board. Endless mode after that.
+- **Run summary export**: copy or share a full log of the run (every launch, round, purchase and the final build) to send in for balance changes.
+- **Check for updates** on the title screen. The app also checks GitHub at launch and downloads a new version only if you say yes.
 
 ## Install
 
