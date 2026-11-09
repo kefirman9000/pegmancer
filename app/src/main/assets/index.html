@@ -102,6 +102,10 @@ canvas{display:block;border-radius:10px;touch-action:none}
 .tag{text-align:center;color:var(--muted);font-weight:700;text-wrap:balance;font-size:14px}
 h2{font-family:var(--display);font-weight:400;font-size:30px;margin:0;text-align:center;text-wrap:balance}
 h3{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:2px 0 0;font-weight:800}
+@keyframes pulseBtn{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.big.pulse{animation:pulseBtn 1.1s ease-in-out infinite}
+.big.alt{background:transparent;color:var(--gold);box-shadow:inset 0 0 0 2.5px var(--gold),0 4px 0 #0006}
+@media (prefers-reduced-motion:reduce){.big.pulse{animation:none}}
 .big{font-family:var(--display);font-size:20px;background:var(--gold);color:#2a0a00;border:0;border-radius:14px;padding:13px 18px;box-shadow:0 4px 0 #8a3a00}
 .big:active{transform:translateY(2px);box-shadow:0 2px 0 #8a3a00}
 .big:disabled{background:var(--panel2);color:var(--muted);box-shadow:none}
@@ -981,7 +985,7 @@ function showClaw(head,lines){
   showOv(`${sumHTML(head,lines)}<h2 style="font-size:24px">Soul Lottery</h2><div class="tag">Three tries. Stop the claw over a prize. It doesn't always hold on.</div>
    <div class="claw"><div class="rail"></div><div class="hand" id="hand"><i></i><b></b></div><div class="prizes" id="prz">${prizes.map((p,i)=>`<div class="prize" data-p="${i}">?</div>`).join('')}</div></div>
    <button class="big" id="grabBtn" type="button">Grab (3 left)</button><div class="next" id="clawMsg">&nbsp;</div>
-   ${nextHTML()}<button class="chipbtn" id="contBtn" type="button">Skip to round ${st.round+1}</button>`);
+   ${nextHTML()}<button class="big alt" id="contBtn" type="button" style="width:100%;margin-top:10px;font-size:22px;padding:15px 18px">Skip to round ${st.round+1} ›</button>`);
   const hand=$('hand'),prz=$('prz');
   const tick=()=>{if(ov.hidden||grabs<=0)return;pos+=dir*.012;if(pos>1){pos=1;dir=-1}if(pos<0){pos=0;dir=1}hand.style.left=`calc(10px + ${pos} * (100% - 20px))`;raf=requestAnimationFrame(tick)};tick();
   $('grabBtn').onclick=()=>{
@@ -1002,7 +1006,7 @@ function showClaw(head,lines){
     }
     logEv('claw: '+msg);$('clawMsg').textContent=msg;
     $('grabBtn').textContent=grabs?`Grab (${grabs} left)`:'Out of tries';$('grabBtn').disabled=!grabs;
-    if(!grabs)$('contBtn').textContent=`Start round ${st.round+1}`;
+    if(!grabs){const cb=$('contBtn');cb.textContent=`Start round ${st.round+1} ›`;cb.classList.remove('alt');cb.classList.add('pulse')}
     setTimeout(()=>busy=false,350);
   };
   $('contBtn').onclick=()=>{cancelAnimationFrame(raf);nextRound()};
