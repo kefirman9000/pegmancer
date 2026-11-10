@@ -297,6 +297,12 @@ const ITEMS=[
  {id:'thunder',hell:'storm',n:'Thunderhead',g:'TH',r:2,trig:'tick',secs:2,d:L=>`Lightning strikes downwind, hitting ${2+L} pegs on that side`,fn:L=>{const w=windNow(performance.now());const l=numPegs().sort((a,b)=>w>0?b.x-a.x:a.x-b.x).slice(0,2+L);if(l[0]){zaps.push({x1:l[0].x,y1:0,x2:l[0].x,y2:l[0].y,t:0,c:'#ff5aa5'});echoHits(l,'#ff5aa5',{x:l[0].x,y:0})}}},
  {id:'bookmark',hell:'library',n:'Bookmark',g:'Bk',r:1,trig:'passive',d:L=>`Re-read hits also give +${fmt(.1*L)} mult`},
  {id:'index',hell:'library',n:'Index Card',g:'IC',r:2,trig:'popN',every:8,d:L=>`Re-read ${3+L} pegs you already hit this launch`,fn:L=>echoHits(shuffle(numPegs().filter(p=>p.rd)).slice(0,3+L),'#d9b26a')},
+ {id:'brigade',n:'Bucket Brigade',g:'Bb',r:1,trig:'start',d:L=>`A random bucket gets +${fmt(L)} mult for this launch`,fn:L=>{const i=Math.floor(rnd()*NB);st.bkBoost[i]+=L;bucketKick[i]=1;bucketFlash[i]=1;if(curItem>=0)fxBeam(curItem,i*BW+BW/2,BT+20,'#9cff57');popup(i*BW+BW/2,BT-20,'+'+fmt(L),'#9cff57',16)}},
+ {id:'hellmouth',n:'Hellmouth',g:'Mw',r:2,trig:'passive',d:L=>`The middle bucket pays ×${3+L} instead of ×1`},
+ {id:'geyser',n:'Brimstone Geyser',g:'BG2',r:2,trig:'land',d:L=>`Landing erupts, hitting the ${3*L} lowest pegs above that bucket`,fn:(L,c)=>{const cx=c.bucket*BW+BW/2;const l=numPegs().filter(p=>Math.abs(p.x-cx)<BW).sort((a,b)=>b.y-a.y).slice(0,3*L);if(l.length){if(curItem>=0)fxBeam(curItem,cx,BT,'#ff8a1a');echoHits(l,'#ff8a1a',{x:cx,y:BT})}}},
+ {id:'chute',n:'Payout Chute',g:'Ch',r:1,trig:'land',d:L=>`Landing in a ×2 or better bucket pays ${L} coin${L>1?'s':''}`,fn:(L,c)=>{if(bucketMult(c.bucket)>=2&&!modIs('tax')){st.coins+=L;popup(c.bucket*BW+BW/2,BT-36,'+'+L+'c','#ffd54a',14)}}},
+ {id:'trampoline',n:'Trampoline of Torment',g:'TT',r:2,trig:'land',d:L=>`The first ${L>1?L+' landings':'landing'} each launch bounce${L>1?'':'s'} back to the top`,fn:(L,c)=>{D.tramp=D.tramp||0;if(D.tramp<L&&!c.bounce){D.tramp++;c.bounce=true}}},
+ {id:'stakes',n:'Rising Stakes',g:'RS2',r:2,trig:'land',d:L=>`The bucket you land in gets +${fmt(.25*L)} mult for the rest of the round`,fn:(L,c)=>{st.bkRound[c.bucket]+=.25*L;popup(c.bucket*BW+BW/2,BT-36,'STAKES +'+fmt(.25*L),'#9cff57',13)}},
  {id:'rocket',n:'Hellfire Rocket',g:'Rk',r:2,trig:'wallN',every:4,d:L=>`Blast at the soul (size ${L})`,fn:(L,c)=>{const b=c.ball||anyBall();if(b)explode(b.x,b.y,50+15*L)}},
 ];
 const CURSED=[
@@ -412,7 +418,23 @@ function applyHellUI(){
   const m=document.querySelector('meta[name=theme-color]');if(m)m.content=h.ui[0];
   hellPitch=h.pitch;hellWave=h.wave;
 }
+// Enchanted buckets: permanent for the run, bought as board upgrades. Each changes what happens when a soul lands in it.
+const BK={
+ fire:{n:'Furnace Bucket',c:'#ff6a00',g:'🔥',d:'Landing erupts up its column, hitting every peg above it.'},
+ coin:{n:'Tithe Bucket',c:'#ffd54a',g:'$',d:'Landing pays coins equal to its multiplier, rounded up.'},
+ spring:{n:'Spring Bucket',c:'#5ce1ff',g:'⤒',d:'The first soul to land in it each launch is flung back to the top.'},
+ grow:{n:'Fattening Bucket',c:'#9cff57',g:'+',d:'Gains +0.25 mult for the rest of the run every time a soul lands in it.'},
+ crimson:{n:'Crimson Bucket',c:'#ff3b5c',g:'×',d:'Landing adds its multiplier to your mult as well.'},
+ spawn:{n:'Spawning Bucket',c:'#c86bff',g:'◎',d:'Landing releases 2 fresh souls from the top above it.'},
+};
+const bkOf=i=>st&&st.bk?st.bk[i]:null;
 const BOARD_UPG=[
+ {id:'bk_fire',n:'Furnace Bucket',bk:'fire',d:BK.fire.d+' Enchants a random plain bucket.',p:9},
+ {id:'bk_coin',n:'Tithe Bucket',bk:'coin',d:BK.coin.d+' Enchants a random plain bucket.',p:7},
+ {id:'bk_spring',n:'Spring Bucket',bk:'spring',d:BK.spring.d+' Enchants a random plain bucket.',p:8},
+ {id:'bk_grow',n:'Fattening Bucket',bk:'grow',d:BK.grow.d+' Enchants a random plain bucket.',p:8},
+ {id:'bk_crimson',n:'Crimson Bucket',bk:'crimson',d:BK.crimson.d+' Enchants a random plain bucket.',p:10},
+ {id:'bk_spawn',n:'Spawning Bucket',bk:'spawn',d:BK.spawn.d+' Enchants a random plain bucket.',p:9},
  {id:'addRed',n:'Wrath Sigils',k:'mult',d:'Turn 2 torment pegs into wrath sigils (+1 mult each).',p:5},
  {id:'addGold',n:'Coin Sigils',k:'gold',d:'Turn 2 torment pegs into coin sigils (+1 coin per hit).',p:4},
  {id:'addBump',n:'Rubber Sigils',k:'bumper',d:'Turn 2 torment pegs into rubber sigils (big bounce).',p:4},
@@ -584,12 +606,14 @@ function noteDoubled(n){if(!D||!n)return;for(let k=0;k<n;k++){D.dbls=(D.dbls||0)
 function growPegs(n){const t=baseVal()*4;shuffle(numPegs()).slice(0,n).forEach(p=>{p.v=Math.max(p.v,t);p.born=Math.max(p.born,p.v);p.flash=1})}
 function convert(kind,n){shuffle(numPegs()).slice(0,n).forEach(p=>{p.kind=kind;p.v=0;p.flash=1});st.specials[kind]=(st.specials[kind]||0)+n}
 function bucketMult(i){
-  if(st.bucketOrder)i=st.bucketOrder[i];
+  const phys=i;if(st.bucketOrder)i=st.bucketOrder[i];
   let m=[4,2,1.5,1,1.5,2,4][i];
+  if(i===3&&has('hellmouth'))m=3+lvlOf('hellmouth');
   if(i===0||i===6)m+=st.perm.edge;
   if(modIs('astronomer')&&i>=2&&i<=4)m=.5;
   if(modIs('shrink'))m=Math.max(.5,m/2);
-  return m;
+  if(st.bkGrow)m+=st.bkGrow[phys]+st.bkRound[phys]+st.bkBoost[phys];
+  return Math.round(m*100)/100;
 }
 function target(){
   // quotas climb faster than before, and never drop below 30% of what you scored last round
@@ -689,6 +713,7 @@ function resumeRun(){
   st=v;rnd=seeded((st.seed+st.round*7919+st.dropNo*104729)>>>0);balls=[];D=null;tally=null;sel=null;st.launchAnim=null;
   st.pegs.forEach(p=>{p.nb=st.pegs.filter(q=>q!==p&&Math.hypot(q.x-p.x,q.y-p.y)<64);p.cool=0});
   if(!st.hells)st.hells=DEF_HELLS.slice();st.bones=[];
+  if(!st.bk){st.bk=Array(7).fill(null);st.bkGrow=Array(7).fill(0)}st.bkRound=st.bkRound||Array(7).fill(0);st.bkBoost=Array(7).fill(0);
   logEv('resumed run');hudKey='';hideOv();renderTray();renderBar();applyHellUI();
   if(st.phase==='between'||st.dropsLeft<=0){st.phase='aim';endRound()}
   else{st.phase='aim';setLive('Run resumed. '+AIM_HINT)}
@@ -697,7 +722,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden&&st&&st.pha
 function newRun(opt={}){
   const seed=opt.seed||((Math.random()*2**31)>>>0);rnd=seeded(seed);
   st={seed,hells:['office',null,null,'abyss'],bones:[],daily:opt.daily||null,variant:opt.daily?'standard':meta.sel,scramblesLeft:0,round:1,lives:3,maxLives:3,coins:5,inv:[],slots:4,perks:[],foods:[],foodSlots:2,keys:0,frozen:[],
-      specials:{mult:5,gold:3,bumper:1,shackle:1},perm:{edge:0,red:0},pegs:[],mod:null,bucketOrder:null,
+      bk:[null,null,null,null,null,null,null],bkGrow:[0,0,0,0,0,0,0],bkRound:[0,0,0,0,0,0,0],bkBoost:[0,0,0,0,0,0,0],specials:{mult:5,gold:3,bumper:1,shackle:1},perm:{edge:0,red:0},pegs:[],mod:null,bucketOrder:null,
       dropsLeft:0,dropsMax:0,dropNo:0,roundScore:0,tgt:0,restocksRound:0,restocksRun:0,quotaHit:false,roundBonus:0,espresso:false,
       phase:'aim',bestDrop:0,offers:null,endless:false,
       log:{started:new Date().toISOString(),drops:[],rounds:[],events:[]}};
@@ -720,7 +745,7 @@ function startRound(){
   if(modIs('foreman'))st.pegs.forEach(p=>{if(p.kind!=='num'&&p.kind!==null)p.off=true});
   st.dropsMax=Math.max(1,5+(has('hopper')?1:0)+(has('clock')?2:0)-(modIs('short')?1:0)-(isV('hoarder')?1:0));
   st.scramblesLeft=1+(hasPerk('disorder')?1:0);
-  st.forms=0;st.relayCh=1;st.dropsLeft=st.dropsMax;st.dropNo=0;st.roundScore=0;st.quipLevel=0;st.restocksRound=0;st.quotaHit=false;st.roundBonus=0;
+  st.bkRound=Array(7).fill(0);st.forms=0;st.relayCh=1;st.dropsLeft=st.dropsMax;st.dropNo=0;st.roundScore=0;st.quipLevel=0;st.restocksRound=0;st.quotaHit=false;st.roundBonus=0;
   checkEvolve();
   D={points:0,mult:1};fire('round',{});D=null;
   st.tgt=target();st.phase='aim';balls=[];st.launchAnim=null;pull=0;dragging=false;st.hellUsed=false;
@@ -734,7 +759,7 @@ function tryDrop(pw=.5,ch=0){
   if(!st||st.phase!=='aim'||st.dropsLeft<=0)return;
   st.phase='falling';st.dropNo++;sel=null;renderTray();if(tally)tally.t=Math.max(tally.t,TALLY_END-.3);liveBump.lp=0;liveBump.lm=1;
   D={points:0,mult:1,hits:0,pops:0,walls:0,bucket:0,bucketBonus:0,firstPop:false,cleared:false,triple:0,espresso:st.espresso,fx:{},chainLeft:4000,chain:0,links:0};chainQ.length=0;st.espresso=false;
-  st.pegs.forEach(p=>{p.used=false;p.rd=false});st.bones=[];
+  st.pegs.forEach(p=>{p.used=false;p.rd=false});st.bones=[];st.bkBoost=Array(7).fill(0);
   if(modIs('gardener'))shuffle(numPegs()).slice(0,6).forEach(p=>{p.kind=null;p.v=0});
   if(modIs('astronomer'))st.bucketOrder=shuffle([0,1,2,3,4,5,6]);
   const m=muzzle(aimAng);spawn(m.x,m.y,Math.sin(aimAng)*SHOT,Math.cos(aimAng)*SHOT);
@@ -748,7 +773,7 @@ function tryDrop(pw=.5,ch=0){
   if(hasPerk('early')&&st.dropNo===1)forceTrigger('first',3);
   blip(220,.08,'sine',.06);
 }
-function popup(x,y,text,color='#fff',size=14,slow=1){if(pops.length>140)pops.shift();pops.push({x,y,text,color,size,t:0,k:slow})}
+function popup(x,y,text,color='#fff',size=14,slow=1){if(pops.length>140)pops.shift();const hw=Math.min(W/2-4,String(text).length*size*.3+6);x=Math.max(hw,Math.min(W-hw,x));pops.push({x,y,text,color,size,t:0,k:slow})}
 
 let chainQ=[],curGen=0;const zaps=[];const CHAIN_MS=[[15,'CHAIN ×15','#5ce1ff'],[40,'CHAIN REACTION ×40','#9cff57'],[100,'CHAIN REACTION ×100!','#ffb02e'],[250,'MELTDOWN ×250!!','#ff3b2f'],[1000,'TOTAL MELTDOWN ×1000!!!','#ff4fd8']];
 function nearPegs(p,n){return numPegs().filter(q=>q!==p).sort((a,c)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(c.x-p.x,c.y-p.y)).slice(0,n)}
@@ -843,15 +868,36 @@ function burst(x,y,color,n,spd=120,size=2.5,grav=300){if(reduceMotion)n=Math.cei
 function flash(c,a){if(reduceMotion)a*=.4;flashC=c;flashA=Math.max(flashA,a)}
 function rain(n){for(let i=0;i<n;i++){if(parts.length>800)parts.shift();parts.push({x:rnd()*W,y:-10-rnd()*120,vx:(rnd()-.5)*30,vy:180+rnd()*220,life:0,max:1.4+rnd()*.6,color:pick(['#ffb02e','#ff6a00','#e9eefc','#ff3b2f']),size:2+rnd()*2.5,grav:220})}}
 function bumpEl(id){const e=$(id);if(!e)return;e.classList.remove('bump');void e.offsetWidth;e.classList.add('bump')}
-const bucketFlash=new Array(NB).fill(0);
+const bucketFlash=new Array(NB).fill(0),bucketKick=new Array(NB).fill(0),bucketRays=[];
+// landing effects scale with the bucket: a dud puffs, a x1.5 rings, a x2 flares, a x4 erupts in gold
+function landFx(i,m){
+  const cx=i*BW+BW/2,acc=curHell().acc;
+  if(m<1){burst(cx,BT+10,'#8a7a70',8,90,2);blip(180,.25,'sine',.04);setTimeout(()=>blip(140,.3,'sine',.035),140);return}
+  if(m<1.5){burst(cx,BT+6,'#5aa9ff',12,150,2.5);blip(330,.1,'triangle',.045);return}
+  if(m<2){blasts.push({x:cx,y:BT,r:38,t:0,c:'#b26bff'});blasts.push({x:cx,y:BT,r:60,t:-.15,c:'#b26bff'});burst(cx,BT,'#b26bff',16,200,2.5);blip(440,.14,'triangle',.05);return}
+  if(m<4){for(let k=0;k<24;k++)parts.push({x:cx+(rnd()-.5)*BW*.7,y:BT,vx:(rnd()-.5)*90,vy:-220-rnd()*260,life:0,max:.6+rnd()*.3,color:pick(['#ff4d6d','#ff8a1a',acc]),size:2.5,grav:200});shake=Math.max(shake,4);blip(520,.16,'sawtooth',.04);setTimeout(()=>blip(660,.12,'sawtooth',.035),90);return}
+  bucketRays.push({i,t:0});shake=Math.max(shake,8);flash('#ffd54a',.12);for(let k=0;k<30;k++)parts.push({x:cx,y:BT,vx:(rnd()-.5)*320,vy:-300-rnd()*300,life:0,max:1+rnd()*.4,color:pick(['#ffd54a','#fff3c4',acc]),size:3,grav:600});
+  chord(m>=8?[523,659,784,1046,1318]:[523,659,784,1046]);
+}
+function relaunch(b,x){b.alive=true;b.bin=-1;b.x=x;b.y=BT-14;b.vx=(rnd()-.5)*160;b.vy=-760-rnd()*120;b.still=0;b.t=0}
 function landBall(b){
   b.alive=false;
-  const i=Math.max(0,Math.min(NB-1,b.bin>=0?b.bin:Math.floor(b.x/BW)));
-  fire('land',{bucket:i,ball:b});
+  const i=Math.max(0,Math.min(NB-1,b.bin>=0?b.bin:Math.floor(b.x/BW))),cx=i*BW+BW/2,ty=bkOf(i);
+  const c={bucket:i,ball:b,bounce:false};
+  fire('land',c);
+  // a spring bucket, or a trampoline relic, flings the soul back up instead of scoring the landing
+  if(ty==='spring'&&!D.sprung){D.sprung=true;c.bounce=true}
+  if(c.bounce){relaunch(b,cx);bucketKick[i]=1;bucketFlash[i]=1;burst(cx,BT,BK.spring.c,18,320,2.5);popup(cx,BT-24,'BOING','#5ce1ff',18);blip(240,.25,'sine',.06);return}
   const m=bucketMult(i);
+  landFx(i,m);
+  if(ty==='fire'){const col=numPegs().filter(p=>Math.abs(p.x-cx)<BW*.6).sort((a,b2)=>b2.y-a.y);zaps.push({x1:cx,y1:BT,x2:cx,y2:col.length?col[col.length-1].y:BT-200,t:0,c:BK.fire.c});for(let k=0;k<30;k++)parts.push({x:cx+(rnd()-.5)*BW*.6,y:BT,vx:(rnd()-.5)*60,vy:-300-rnd()*400,life:0,max:.7+rnd()*.4,color:pick(['#ff6a00','#ffb02e','#ff3b2f']),size:3,grav:300});echoHits(col,BK.fire.c,{x:cx,y:BT});popup(cx,BT-50,'ERUPTION','#ff6a00',18);shake=Math.max(shake,7)}
+  if(ty==='coin'&&!modIs('tax')){const n=Math.ceil(m);st.coins+=n;for(let k=0;k<10+n*2;k++)parts.push({x:cx,y:BT,vx:(rnd()-.5)*180,vy:-200-rnd()*220,life:0,max:.9,color:'#ffd54a',size:2.5,grav:700});popup(cx,BT-50,'+'+n+'c','#ffd54a',18);renderBar()}
+  if(ty==='grow'){st.bkGrow[i]+=.25;popup(cx,BT-50,'+0.25 forever','#9cff57',14)}
+  if(ty==='crimson'){D.mult+=m;popup(cx,BT-50,'+'+fmt(m)+' MULT','#ff3b5c',18);flash('#ff3b5c',.12)}
+  if(ty==='spawn'){for(let k=0;k<2;k++)spawn(cx+(k?14:-14),DROP_Y,(k?1:-1)*60,40);popup(cx,BT-50,'+2 SOULS','#c86bff',16);zaps.push({x1:cx,y1:BT,x2:cx,y2:DROP_Y,t:0,c:'#c86bff'})}
   if(hasPerk('jackpot')&&m>=4)forceTrigger('first',1,{bucket:i,ball:b});
   D.bucket=Math.max(D.bucket,m+D.bucketBonus);
-  bucketFlash[i]=1;popup(i*BW+BW/2,BT-14,'×'+fmt(m+D.bucketBonus),'#fff',16);blip(300+m*120,.12,'square',.04);
+  bucketFlash[i]=1;bucketKick[i]=1;popup(i*BW+BW/2,BT-14,'×'+fmt(m+D.bucketBonus),'#fff',m>=4?24:m>=2?20:16);
   if(m>=4&&!D.jackpot)jackpot(i*BW+BW/2);
 }
 function jackpot(x){
@@ -1045,7 +1091,7 @@ function rollMarket(keepFrozen){
   const frozen=keepFrozen?st.frozen.filter(o=>!o.sold):[];
   const items=frozen.slice();const used=new Set(frozen.map(o=>o.it.id));
   for(let guard=0;items.length<4&&guard<60;guard++){const it=randomItem();if(!it)break;if(used.has(it.id))continue;used.add(it.id);items.push({it,price:itemPrice(it),sold:false,frozen:false})}
-  const up=pick(BOARD_UPG);
+  const up=pick(BOARD_UPG.filter(u=>!u.bk||(st.bk&&st.bk.some(x=>!x))));
   st.offers={items,up:{u:up,price:Math.round(up.p*priceMul()),sold:false},rerolls:0,slotBought:false};
 }
 function showMarket(head,lines){ovBack={head,lines};rollMarket(true);renderMarket()}
@@ -1061,7 +1107,7 @@ function renderMarket(){
    <h2 style="font-size:24px">Infernal Commissary</h2>
    <div class="offers">${items}</div>
    <h3>Board upgrade</h3>
-   <div class="offers"><div class="offer ${U.sold?'sold':''}"><div class="ic" style="border-color:${SPECIAL[U.u.k]};background:${SPECIAL[U.u.k]}22"><span class="pd" style="background:${SPECIAL[U.u.k]}"></span></div><div class="nm">${U.u.n}</div><div class="ds">${U.u.d}</div><button class="buy" id="buyUp" type="button" ${!U.sold&&st.coins>=U.price?'':'disabled'}>${U.sold?'Bought':U.price+' coins'}</button></div>
+   <div class="offers"><div class="offer ${U.sold?'sold':''}">${U.u.bk?`<div class="ic" style="border-color:${BK[U.u.bk].c};color:${BK[U.u.bk].c};background:${BK[U.u.bk].c}22;font-weight:800">${BK[U.u.bk].g}</div>`:`<div class="ic" style="border-color:${SPECIAL[U.u.k]};background:${SPECIAL[U.u.k]}22"><span class="pd" style="background:${SPECIAL[U.u.k]}"></span></div>`}<div class="nm">${U.u.n}</div><div class="ds">${U.u.d}</div><button class="buy" id="buyUp" type="button" ${!U.sold&&st.coins>=U.price&&!(U.u.bk&&!st.bk.some(x=>!x))?'':'disabled'}>${U.sold?'Bought':U.u.bk&&!st.bk.some(x=>!x)?'All enchanted':U.price+' coins'}</button></div>
    <div class="offer"><div class="ic" style="border-color:var(--fg);color:var(--fg)">+</div><div class="nm">Extra relic shelf</div><div class="ds">${st.slots>=7?'You have the maximum of 7 slots.':`Go from ${st.slots} to ${st.slots+1} slots.`}</div><button class="buy" id="buySlot" type="button" ${st.slots<7&&!O.slotBought&&st.coins>=slotCost()?'':'disabled'}>${st.slots>=7?'Maxed':O.slotBought?'Bought':slotCost()+' coins'}</button></div></div>
    <div class="shoprow"><button class="chipbtn" id="rerollBtn" type="button" ${st.coins>=rerollCost()?'':'disabled'}>Reroll · ${rerollCost()?rerollCost()+' coins':'free'}</button><div class="spacer"></div><span style="color:var(--gold);font-weight:800">${st.coins} coins</span></div>
    ${st.keys?`<button class="door" id="doorBtn" type="button">Use a Ledger Key (${st.keys}) to open the Black Ledger</button>`:''}
@@ -1071,7 +1117,7 @@ function renderMarket(){
    <button class="chipbtn" id="ovExp" type="button">Export run summary</button>`);
   ovCard.querySelectorAll('[data-buy]').forEach(b=>b.onclick=()=>{const o=O.items[+b.dataset.buy];if(o.sold||st.coins<o.price)return;if(!gainItem(o.it.id,o.price))return;st.coins-=o.price;o.sold=true;o.frozen=false;logEv(`bought ${o.it.n} for ${o.price}`);chord([660,880]);renderBar();renderMarket()});
   ovCard.querySelectorAll('[data-frz]').forEach(b=>b.onclick=()=>{const o=O.items[+b.dataset.frz];o.frozen=!o.frozen;renderMarket()});
-  $('buyUp').onclick=()=>{if(U.sold||st.coins<U.price)return;st.coins-=U.price;U.sold=true;const u=U.u;if(u.id==='edges')st.perm.edge++;else if(u.id==='hotred')st.perm.red+=.5;else convert(u.k,/Split|Agony/.test(u.n)?1:2);logEv(`bought board upgrade ${u.n} for ${U.price}`);chord([660,880]);renderMarket()};
+  $('buyUp').onclick=()=>{if(U.sold||st.coins<U.price)return;const u=U.u;if(u.bk&&!st.bk.some(x=>!x))return;st.coins-=U.price;U.sold=true;if(u.bk){const free=st.bk.map((x,i)=>x?-1:i).filter(i=>i>=0);st.bk[pick(free)]=u.bk}else if(u.id==='edges')st.perm.edge++;else if(u.id==='hotred')st.perm.red+=.5;else convert(u.k,/Split|Agony/.test(u.n)?1:2);logEv(`bought board upgrade ${u.n} for ${U.price}`);chord([660,880]);renderMarket()};
   $('buySlot').onclick=()=>{const c=slotCost();if(st.slots>=7||O.slotBought||st.coins<c)return;st.coins-=c;st.slots++;O.slotBought=true;logEv(`bought item slot ${st.slots} for ${c}`);renderBar();renderMarket()};
   $('rerollBtn').onclick=()=>{const c=rerollCost();if(st.coins<c)return;st.coins-=c;const keep=O.items.filter(o=>o.frozen&&!o.sold);const r=O.rerolls+1;st.frozen=keep;rollMarket(true);st.offers.rerolls=r;st.offers.up=O.up;st.offers.slotBought=O.slotBought;logEv(`reroll for ${c}`);blip(500,.1);renderMarket()};
   const door=$('doorBtn');if(door)door.onclick=()=>{st.keys--;logEv('used a Ledger Key');showBlackMarket(renderMarket)};
@@ -1335,7 +1381,8 @@ function step(dt){
     if(b.x<r){b.x=r;b.vx=Math.abs(b.vx)*.7;wallHit(b)}
     if(b.x>PW-r){b.x=PW-r;b.vx=-Math.abs(b.vx)*.7;wallHit(b)}
     if(b.y<r&&b.vy<0){b.y=r;b.vy=Math.abs(b.vy)*.5}
-    if(b.y<BT){for(const p of st.pegs){if(!p.kind||p.off)continue;
+    if(b.ghost>0)b.ghost-=dt;
+    if(b.y<BT&&!(b.ghost>0)){for(const p of st.pegs){if(!p.kind||p.off)continue;
       if(p.kind==='num'&&p.v<=1){const rr=pegR(p)+r;if((b.x-p.x)**2+(b.y-p.y)**2<rr*rr)hitPeg(p,b);continue}
       if(collide(b,p,pegR(p),r))hitPeg(p,b)}}
     for(const p of posts)collide(b,p,4,r);
@@ -1347,6 +1394,11 @@ function step(dt){
     }
     if(sp<18)b.still+=dt;else b.still=0;
     if(b.still>1.2){b.vx=(rnd()<.5?-1:1)*140;b.vy=-120;b.still=0}
+    // wedge check: a soul pinned between a peg and a wall keeps jittering, so also watch whether it has
+    // actually gone anywhere. If it hasn't moved 12px in 0.7s, push it toward the middle and let it slip
+    // through pegs for a moment; longer each time it gets stuck again.
+    if(b.y<BT){if(b.ax==null){b.ax=b.x;b.ay=b.y;b.at=0}b.at+=dt;
+      if(b.at>=.7){if(Math.hypot(b.x-b.ax,b.y-b.ay)<12){b.stuck=(b.stuck||0)+1;b.vx=(b.x<W/2?1:-1)*(180+40*b.stuck);b.vy=Math.max(b.vy,60);b.ghost=Math.min(1,.25*b.stuck);b.still=0}b.ax=b.x;b.ay=b.y;b.at=0}}
     if(b.y>H-r-2||b.t>25)landBall(b);
   }
 }
@@ -1475,6 +1527,34 @@ function drawLava(t){const y0=lavaY(t),T=t/1000;ctx.save();const g=ctx.createLin
 const wellPos=t=>({x:W/2+Math.sin(t/1000*.23)*120,y:330+Math.sin(t/1000*.31+1)*110});
 function drawWell(t){const w=wellPos(t),T=t/1000;ctx.save();const g=ctx.createRadialGradient(w.x,w.y,0,w.x,w.y,72);g.addColorStop(0,'#000');g.addColorStop(.35,'#120a26ee');g.addColorStop(1,'#a46bff00');ctx.fillStyle=g;ctx.beginPath();ctx.arc(w.x,w.y,72,0,7);ctx.fill();ctx.strokeStyle='#a46bff88';ctx.lineWidth=1.5;for(let k=0;k<3;k++){ctx.beginPath();ctx.arc(w.x,w.y,24+k*16,T*(1+k*.4),T*(1+k*.4)+4);ctx.stroke()}ctx.restore()}
 const windNow=t=>160*Math.sin(t/1000*.35+.7*Math.sin(t/1000*.11));
+function drawBuckets(t){
+  const T=t/1000,id=hellIdOf(st.round),acc=curHell().acc;
+  for(let n=bucketRays.length-1;n>=0;n--){const R=bucketRays[n];R.t+=.016;if(R.t>1){bucketRays.splice(n,1);continue}
+    const cx=R.i*BW+BW/2;ctx.save();ctx.globalAlpha=(1-R.t)*.5;ctx.fillStyle='#ffd54a';for(let k=0;k<7;k++){const a=-Math.PI/2+(k-3)*.22+Math.sin(T*3+k)*.03;ctx.beginPath();ctx.moveTo(cx,BT);ctx.lineTo(cx+Math.cos(a-.05)*420,BT+Math.sin(a-.05)*420);ctx.lineTo(cx+Math.cos(a+.05)*420,BT+Math.sin(a+.05)*420);ctx.fill()}ctx.restore()}
+  for(let i=0;i<NB;i++){
+    const x=i*BW,m=bucketMult(i),f=bucketFlash[i],kk=bucketKick[i],ty=bkOf(i),cx=x+BW/2;
+    const hot=m>=4?'#ffc93c':m>=2?'#ff4d6d':m>=1.5?'#b26bff':m>=1?'#5aa9ff':'#8a7a70';
+    const dy=-Math.sin(kk*Math.PI)*6;ctx.save();ctx.translate(0,dy);
+    // body
+    const g=ctx.createLinearGradient(0,BT,0,H);g.addColorStop(0,hot+(f>0?'cc':'55'));g.addColorStop(1,hot+'11');ctx.fillStyle=g;
+    ctx.beginPath();if(id==='crypt'){ctx.moveTo(x+2,BT);ctx.lineTo(x+BW-2,BT);ctx.lineTo(x+BW-7,H);ctx.lineTo(x+7,H)}else if(id==='kitchen'){ctx.moveTo(x+2,BT);ctx.lineTo(x+BW-2,BT);ctx.quadraticCurveTo(x+BW-2,H,cx,H);ctx.quadraticCurveTo(x+2,H,x+2,BT)}else ctx.rect(x+2,BT,BW-4,H-BT);ctx.fill();
+    // liquid surface that sloshes, in the hell's colour
+    const lvl=BT+18+Math.sin(T*2+i)*2-f*6;ctx.fillStyle=(id==='lava'?'#ff6a00':id==='ice'?'#d8f2ff':id==='abyss'?'#2a1250':hot)+'44';ctx.beginPath();ctx.moveTo(x+3,H);ctx.lineTo(x+3,lvl);for(let k=0;k<=6;k++){const xx=x+3+(BW-6)*k/6;ctx.lineTo(xx,lvl+Math.sin(T*3+k+i*2)*1.6)}ctx.lineTo(x+BW-3,H);ctx.fill();
+    if(id==='lava'||id==='kitchen')for(let k=0;k<2;k++){const ph=(T*.8+hash(i*7+k))%1;ctx.fillStyle='#ffffff30';ctx.beginPath();ctx.arc(x+10+hash(i+k*3)*(BW-20),H-ph*(H-lvl),2+ph*2,0,7);ctx.fill()}
+    if(id==='ice'){ctx.strokeStyle='#e6f6ff66';ctx.lineWidth=1;for(let k=0;k<3;k++){ctx.beginPath();ctx.moveTo(x+6+k*14,BT);ctx.lineTo(x+10+k*14,BT+8);ctx.stroke()}}
+    if(id==='mirror'){const sx=x+((T*30+i*20)%(BW+30))-15;ctx.fillStyle='#ffffff18';ctx.fillRect(sx,BT,6,H-BT)}
+    // rim, coloured by enchantment
+    ctx.strokeStyle=ty?BK[ty].c:acc+'66';ctx.lineWidth=ty?2.5:1.2;ctx.beginPath();ctx.moveTo(x+2,BT);ctx.lineTo(x+BW-2,BT);ctx.stroke();
+    if(ty){ctx.globalAlpha=.6+.4*Math.sin(T*3+i);ctx.strokeStyle=BK[ty].c;ctx.lineWidth=1.5;ctx.strokeRect(x+3,BT+1,BW-6,H-BT-2);ctx.globalAlpha=1}
+    // multiplier, punched up on landing
+    const sz=(m>=4?24:22)*(1+.45*kk);ctx.font=Math.round(sz)+'px "Lilita One", sans-serif';ctx.textAlign='center';ctx.fillStyle=f>0?'#fff':hot;
+    if(m>=4){ctx.shadowColor=hot;ctx.shadowBlur=8+6*Math.sin(T*4)}ctx.fillText('×'+fmt(m),cx,BT+38);ctx.shadowBlur=0;
+    if(ty){ctx.font='800 12px Nunito, sans-serif';ctx.fillStyle=BK[ty].c;ctx.fillText(BK[ty].g,cx,BT+54)}
+    else if(st.bkGrow[i]+st.bkRound[i]+st.bkBoost[i]>0){ctx.font='800 9px Nunito, sans-serif';ctx.fillStyle='#9cff57';ctx.fillText('▲',cx,BT+52)}
+    ctx.restore();
+    bucketFlash[i]=Math.max(0,f-.03);bucketKick[i]=Math.max(0,kk-.06);
+  }
+}
 function draw(t){
   ctx.save();
   if(shake>0)ctx.translate((rnd()-.5)*shake,(rnd()-.5)*shake);
@@ -1555,13 +1635,7 @@ function draw(t){
   for(const z of zaps){ctx.globalAlpha=Math.max(0,1-z.t);ctx.strokeStyle=z.c;ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(z.x1,z.y1);const mx=(z.x1+z.x2)/2+(Math.sin(z.t*40+z.x2)*8),my=(z.y1+z.y2)/2;ctx.lineTo(mx,my);ctx.lineTo(z.x2,z.y2);ctx.stroke()}ctx.globalAlpha=1;
   for(const b of blasts){ctx.globalAlpha=Math.max(0,1-b.t);ctx.strokeStyle=b.c||'#ff8a3d';ctx.lineWidth=3;circle(b.x,b.y,b.r*(.4+.6*b.t));ctx.stroke()}ctx.globalAlpha=1;
   // buckets
-  if(st&&st.log)for(let i=0;i<NB;i++){
-    const x=i*BW,m=bucketMult(i),f=bucketFlash[i];
-    const hot=m>=4?'#ffc93c':m>=2?'#ff4d6d':m>=1.5?'#b26bff':'#5aa9ff';
-    ctx.fillStyle=hot+(f>0?'aa':'33');ctx.fillRect(x+2,BT,BW-4,H-BT);
-    ctx.fillStyle=f>0?'#fff':hot;ctx.font='22px "Lilita One", sans-serif';ctx.textAlign='center';ctx.fillText('×'+fmt(m),x+BW/2,BT+38);
-    bucketFlash[i]=Math.max(0,f-.03);
-  }
+  if(st&&st.log)drawBuckets(t);
   ctx.fillStyle='#5a2318';for(const p of posts){ctx.fillRect(p.x-2,BT,4,H-BT);circle(p.x,p.y,4);ctx.fill()}
   // balls
   const r=ballR();
