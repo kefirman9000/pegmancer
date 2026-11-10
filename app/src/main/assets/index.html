@@ -306,6 +306,14 @@ const ITEMS=[
  {id:'chute',n:'Payout Chute',g:'Ch',r:1,trig:'land',d:L=>`Landing in a ×2 or better bucket pays ${L} coin${L>1?'s':''}`,fn:(L,c)=>{if(bucketMult(c.bucket)>=2&&!modIs('tax')){st.coins+=L;popup(c.bucket*BW+BW/2,BT-36,'+'+L+'c','#ffd54a',14)}}},
  {id:'trampoline',n:'Trampoline of Torment',g:'TT',r:2,trig:'land',d:L=>`The first ${L>1?L+' landings':'landing'} each launch bounce${L>1?'':'s'} back to the top`,fn:(L,c)=>{D.tramp=D.tramp||0;if(D.tramp<L&&!c.bounce){D.tramp++;c.bounce=true}}},
  {id:'stakes',n:'Rising Stakes',g:'RS2',r:2,trig:'land',d:L=>`The bucket you land in gets +${fmt(.25*L)} mult for the rest of the round`,fn:(L,c)=>{st.bkRound[c.bucket]+=.25*L;popup(c.bucket*BW+BW/2,BT-36,'STAKES +'+fmt(.25*L),'#9cff57',13)}},
+ {id:'forge',n:'Tripling Forge',g:'T3',r:2,trig:'hitN',every:8,d:L=>`Triple ${L>1?L+' random pegs':'a random peg'}`,fn:L=>{shuffle(numPegs()).slice(0,L).forEach(p=>{p.v*=3;p.born=Math.max(p.born,p.v);p.flash=1;popup(p.x,p.y-14,'×3','#ff8a1a',14);if(curItem>=0)fxBeam(curItem,p.x,p.y,'#ff8a1a')});noteDoubled(L)}},
+ {id:'square',n:'Abyssal Square',g:'Sq',r:3,trig:'firstPop',d:L=>`Square your ${L>1?L+' smallest pegs':'smallest peg'} (4 becomes 16)`,fn:L=>{numPegs().filter(p=>p.v>1).sort((a,b)=>a.v-b.v).slice(0,L).forEach(p=>{p.v=Math.min(2**40,p.v*p.v);p.born=Math.max(p.born,p.v);p.flash=1;popup(p.x,p.y-14,'SQUARED','#a46bff',15);if(curItem>=0)fxBeam(curItem,p.x,p.y,'#a46bff')})}},
+ {id:'cleaver',n:'Cleaver of Halves',g:'Cv',r:1,trig:'wall',d:L=>`Halve a random peg and score the half you cut off${L>1?', ×'+L:''}`,fn:L=>{const p=pick(numPegs().filter(q=>q.v>1));if(!p)return;const cut=Math.ceil(p.v/2);p.v-=cut;p.flash=1;addPts(cut*L);popup(p.x,p.y-14,'CUT +'+fmt(cut*L),'#ff3b2f',13);if(curItem>=0)fxBeam(curItem,p.x,p.y,'#ff3b2f')}},
+ {id:'leveller',n:'The Leveller',g:'Lv',r:2,trig:'start',d:L=>`Double every peg below ${L>1?L*25+'%':'half'} of your average`,fn:L=>{const n=numPegs();if(!n.length)return;const avg=n.reduce((a,p)=>a+p.v,0)/n.length,lim=avg*(L>1?L*.25:.5);const l=n.filter(p=>p.v<lim);l.forEach(p=>{p.v*=2;p.born=Math.max(p.born,p.v);p.flash=1});noteDoubled(l.length);if(l.length)popup(W/2,BT-110,'LEVELLED ×'+l.length,'#9cff57',16)}},
+ {id:'robin',n:'Robin of the Pit',g:'Rb',r:2,trig:'round',d:L=>`Halve your biggest peg, then double your ${2+L} smallest`,fn:L=>{const n=numPegs().sort((a,b)=>b.v-a.v);if(n.length<4)return;n[0].v=Math.max(1,Math.floor(n[0].v/2));n.slice(-(2+L)).forEach(p=>{p.v*=2;p.born=Math.max(p.born,p.v)});noteDoubled(2+L)}},
+ {id:'coinflip',n:'Damned Coin',g:'Df',r:1,trig:'pop',d:L=>`${50+5*L}%: double a random peg. Otherwise halve one`,fn:L=>{const p=pick(numPegs());if(!p)return;if(rnd()<.5+.05*L){p.v*=2;p.born=Math.max(p.born,p.v);noteDoubled(1);popup(p.x,p.y-14,'HEADS ×2','#ffd54a',12)}else{p.v=Math.max(1,Math.floor(p.v/2));popup(p.x,p.y-14,'TAILS ½','#8a7a70',12)}p.flash=1}},
+ {id:'inflation',n:'Hyperinflation',g:'Hy',r:3,trig:'quota',d:L=>`Double every peg on the board${L>1?' ('+L+' times)':''}. Next quota grows to match`,fn:L=>{const n=numPegs();n.forEach(p=>{p.v*=2**L;p.born=Math.max(p.born,p.v);p.flash=1});noteDoubled(n.length);popup(W/2,BT-140,'HYPERINFLATION','#ffd54a',22,.5);flash('#ffd54a',.2)}},
+ {id:'mitosis',n:'Mitosis',g:'Mt',r:2,trig:'popN',every:6,d:L=>`Split your biggest peg: it halves and ${L>1?L+' empty slots get':'an empty slot gets'} a copy`,fn:L=>{const big=numPegs().sort((a,b)=>b.v-a.v)[0];if(!big||big.v<2)return;big.v=Math.floor(big.v/2);big.flash=1;st.pegs.filter(p=>!p.kind&&!p.under).slice(0,L).forEach(p=>{p.kind='num';p.v=big.v;p.born=big.v;p.flash=1;clearT(p);zaps.push({x1:big.x,y1:big.y,x2:p.x,y2:p.y,t:0,c:'#9cff57'})});popup(big.x,big.y-14,'MITOSIS','#9cff57',14)}},
  {id:'rocket',n:'Hellfire Rocket',g:'Rk',r:2,trig:'wallN',every:4,d:L=>`Blast at the soul (size ${L})`,fn:(L,c)=>{const b=c.ball||anyBall();if(b)explode(b.x,b.y,50+15*L)}},
 ];
 const CURSED=[
@@ -434,9 +442,9 @@ const PEGK={
 const INTRO=Object.assign({},PEGK,{
  armor:{n:'Armored pegs',d:'The grey ring is a shell. It takes 2 or 3 hits to crack before the peg scores.'},
  glass:{n:'Glass pegs',d:'Score ×4 on the first hit, then shatter.'},
- tick:{n:'Ticking pegs',d:'The red badge counts down launches. At zero the peg explodes and halves its neighbours, so pop it first.'},
- imp:{n:'Imps',d:'They hop between pegs and halve them, during and after every launch. Hit one with a soul to slay it for coins.'},
- boss:{n:'Boss on the board',d:'Drain its health with soul hits and pops. You must beat it and make quota to win the round.'},
+ tick:{n:'Ticking pegs',d:'The red badge counts down rounds. At zero the peg explodes and halves its neighbours, so pop it first.'},
+ imp:{n:'Imps',d:'Each imp marks the peg it wants. After your first launch of the round, it hops there and halves it. Slay it with a soul first to stop it.'},
+ boss:{n:'Boss on the board',d:'Drain its health with soul hits and pops. You must beat it and make quota to win. It shows its one move for the round above its health bar; it acts after your first launch.'},
  patience:{n:'The Auditor\'s patience',d:'The bar at the top fills when a launch scores under a quarter of the pace you need. When it fills up, you get punished. Big launches drain it.'},
 });
 const HAZ={office:'tape',lava:'thorn',crypt:'rot',abyss:'thorn',ice:'tape',kitchen:'rot',mirror:'thorn',storm:'tape',library:'tape'};
@@ -503,25 +511,27 @@ function setupRound(){
   restorePegs();
   // last round's temporary pieces turn back into ordinary pegs
   st.pegs.forEach(p=>{p.under=false;if(p.kind==='tape'||p.kind==='thorn'||p.kind==='portal'){p.kind='num';p.v=baseVal();p.born=p.v;clearT(p)}});
-  st.ptouch=0;st.impKills=0;
+  st.ptouch=0;st.impKills=0;st.threatsActed=false;st.snapped=false;
+  if(r>=2)boardTurn();
   // the deeper you go, the more hazards each hell lays out
   if(r>=2){const hz=HAZ[hellIdOf(r)],nh=Math.min(8,1+depth);if(hz==='rot'){if(!st.pegs.some(p=>p.kind==='rot'))placeKind('rot',Math.max(1,Math.floor(nh/3)))}else placeKind(hz,nh)}
   if(curseIs('thorns'))placeKind('thorn',2);
   if(r>=3)addTrait('armor',2+z*2);
   if(r>=2)addTrait('glass',2+Math.floor(rnd()*3));
-  if(r>=3)addTrait('tick',1+(rnd()<.5?1:0));
+  if(r>=3&&!st.pegs.some(p=>p.tick))addTrait('tick',1);
   if(r>=2&&rnd()<.4&&!st.pegs.some(p=>p.kind==='gem'))placeKind('gem',1);
   if(r>=3&&rnd()<.15&&!st.pegs.some(p=>p.kind==='chest'))placeKind('chest',1);
   if(remodelIdx(r)===6&&!st.pegs.some(p=>p.kind==='chest')){const c=st.pegs.filter(p=>p.kind==='num').sort((a,b)=>Math.hypot(a.x-200,a.y-330)-Math.hypot(b.x-200,b.y-330))[0];if(c){clearT(c);c.kind='chest';c.v=0;c.hp=3}}
   // boss on the board
   st.boss=null;
-  if(st.mod&&st.mod.boss){const hp=st.mod.final?30:12+z*6;st.boss={x:200,y:300,r:30,hp,max:hp,shield:0};st.pegs.forEach(p=>{if(Math.hypot(p.x-200,p.y-300)<48){p.off=true;p.under=true}})}
+  if(st.mod&&st.mod.boss){const hp=st.mod.final?30:12+z*6;st.boss={x:200,y:300,r:30,hp,max:hp,shield:0,intent:pick(['shield','smash','thorns'])};st.pegs.forEach(p=>{if(Math.hypot(p.x-200,p.y-300)<48){p.off=true;p.under=true}})}
   // one board event per ordinary round
   st.event=null;
   if(r>=2&&!st.mod&&rnd()<.75){const k=pick(Object.keys(EVENTS));st.event=k;if(EVENTS[k].setup)EVENTS[k].setup()}
   // imps: more of them the deeper you are; survivors stay
   st.imps=(st.imps||[]).filter(i=>i.hp>0);
   const want=Math.min(6,Math.floor((r-1)/6)+z+(curseIs('imps')?1:0));while(st.imps.length<want&&spawnImp());
+  planImps();
   st.bounty=null;if(r>=2)pickBounty();
   // first time you meet something new, explain it
   meta.seenIntro=meta.seenIntro||{};
@@ -530,8 +540,9 @@ function setupRound(){
   const nu=present.find(k=>!meta.seenIntro[k]);if(nu){meta.seenIntro[nu]=1;save('pegmancer.meta',meta);sel={t:'intro',k:nu}}
 }
 function spawnImp(){const p=pick(numPegs().filter(q=>!q.under));if(!p)return false;st.imps.push({pi:st.pegs.indexOf(p),x:p.x,y:p.y-13,fx:p.x,fy:p.y-13,t:1,hp:1});return true}
+function planImps(){const taken=new Set();for(const im of st.imps||[]){if(im.hp<=0)continue;const cur=st.pegs[im.pi];const o=(cur&&cur.nb?cur.nb:[]).filter(q=>q.kind&&!q.off&&!q.under&&!taken.has(q));const q=o.length?pick(o):pick(numPegs().filter(q=>!taken.has(q)));im.tg=q?st.pegs.indexOf(q):-1;if(q)taken.add(q)}}
 function impsHop(){
-  for(const im of st.imps||[]){if(im.hp<=0)continue;const cur=st.pegs[im.pi];const o=(cur&&cur.nb?cur.nb:[]).filter(q=>q.kind&&!q.off);const q=o.length?pick(o):pick(numPegs());if(!q)continue;
+  for(const im of st.imps||[]){if(im.hp<=0)continue;const q=st.pegs[im.tg];if(!q||!q.kind)continue;im.tg=-1;
     im.fx=im.dx??im.x;im.fy=im.dy??im.y;im.pi=st.pegs.indexOf(q);im.x=q.x;im.y=q.y-13;im.t=0;
     if(q.kind==='num'&&q.v>1){q.v=Math.max(1,Math.floor(q.v/2));q.flash=1;popup(q.x,q.y-22,'NIBBLED','#ff3b2f',11)}
     else if(q.kind==='gold'&&st.coins>0){st.coins--;popup(q.x,q.y-22,'-1c','#ff3b2f',12)}}
@@ -541,8 +552,8 @@ function hurtBoss(d,from){const B=st.boss;if(!B||B.hp<=0)return;
   if(B.shield){popup(B.x,B.y-46,'BLOCKED','#9fdcff',13);blip(1200,.05,'square',.03);return}
   B.hp=Math.max(0,B.hp-d);B.hit=1;if(from)zaps.push({x1:from.x,y1:from.y,x2:B.x,y2:B.y,t:0,c:'#ff3b2f'});popup(B.x+(rnd()-.5)*30,B.y-40,'-'+d,'#ff3b2f',14);
   if(B.hp<=0){popup(B.x,B.y,'DEMON BANISHED','#ffd54a',26,.4);flash('#ffd54a',.4);shake=16;burst(B.x,B.y,'#ff3b2f',70,380,3.5);chord([392,523,659,784,1046]);if(!modIs('tax'))st.coins+=5;logEv('banished the boss');st.pegs.forEach(p=>{if(p.under){p.under=false;p.off=false}})}}
-function bossAct(){const B=st.boss,a=pick(['shield','smash','thorns']);
-  if(a==='shield'){B.shield=1;popup(B.x,B.y-50,'SHIELDED THIS LAUNCH','#9fdcff',15)}
+function bossAct(){const B=st.boss,a=B.intent||'smash';B.intent=null;
+  if(a==='shield'){B.shield=1;popup(B.x,B.y-50,'SHIELDED NEXT LAUNCH','#9fdcff',15)}
   if(a==='smash'){shuffle(numPegs()).slice(0,6).forEach(p=>{p.v=Math.max(1,Math.floor(p.v/2));p.flash=1;zaps.push({x1:B.x,y1:B.y,x2:p.x,y2:p.y,t:0,c:'#ff3b2f'})});popup(B.x,B.y-50,'SMASH: 6 PEGS HALVED','#ff3b2f',15);shake=8}
   if(a==='thorns'){placeKind('thorn',3);popup(B.x,B.y-50,'THORNS GROW','#d81e3c',15)}}
 function openChest(p){p.kind=null;p.v=0;clearT(p);burst(p.x,p.y,'#ffd54a',40,260,3);flash('#ffd54a',.2);chord([784,988,1175,1568]);
@@ -550,17 +561,24 @@ function openChest(p){p.kind=null;p.v=0;clearT(p);burst(p.x,p.y,'#ffd54a',40,260
   else{const c=10+zoneOf(st.round)*5;st.coins+=c;popup(p.x,p.y-20,'CHEST +'+c+'c','#ffd54a',18,.4)}renderBar();bountyProg('chest')}
 // after every launch the board fights back
 function afterLaunch(s){
+  // gems grow per launch; imps, the boss, ticking pegs and rot only act once per round
+  for(const p of st.pegs)if(p.kind==='gem'){p.age=(p.age||0)+1;if(p.age>6){popup(p.x,p.y-16,'THE GEM CRUMBLES','#8a7a70',13);burst(p.x,p.y,'#8a7a70',16,120,2);p.kind=null;p.v=0;p.age=0;clearT(p)}else{p.v*=2;p.flash=1;popup(p.x,p.y-16,p.age>=5?'GREED ×2 · CRACKING':'GREED ×2',p.age>=5?'#ff8a1a':'#5ce1ff',12)}}
+  roundAttacksDone(s);
+}
+function boardTurn(){
   for(const p of st.pegs){if(p.kind==='num'&&p.tick>0){p.tick--;p.flash=.6;if(p.tick===0){popup(p.x,p.y-16,'KABOOM','#ff3b2f',18);blasts.push({x:p.x,y:p.y,r:60,t:0,c:'#ff3b2f'});shake=Math.max(shake,8);blip(90,.3,'sawtooth',.06);
     p.nb.forEach(q=>{if(q.kind==='num'){q.v=Math.floor(q.v/2);q.flash=1;if(q.v<=0){q.kind=null;clearT(q)}}});p.kind=null;p.v=0;clearT(p)}}}
-  for(const p of st.pegs)if(p.kind==='gem'){p.age=(p.age||0)+1;if(p.age>6){popup(p.x,p.y-16,'THE GEM CRUMBLES','#8a7a70',13);burst(p.x,p.y,'#8a7a70',16,120,2);p.kind=null;p.v=0;p.age=0;clearT(p)}else{p.v*=2;p.flash=1;popup(p.x,p.y-16,p.age>=5?'GREED ×2 · CRACKING':'GREED ×2',p.age>=5?'#ff8a1a':'#5ce1ff',12)}}
   const rots=st.pegs.filter(p=>p.kind==='rot');
   for(const r of rots){const front=st.pegs.filter(p=>p.kind==='num'&&!p.rotten&&p.nb.some(q=>q===r||q.rotten||r.nb.includes(p)));const q=pick(front.filter(p=>p.nb.includes(r)||p.nb.some(x=>x.rotten)));if(q){q.rotten=true;q.flash=1;popup(q.x,q.y-16,'ROT SPREADS','#7fae3a',11)}}
-  impsHop();
+}
+function roundAttacksDone(s){
+  // threats act once per round, after your first launch, so you get one launch to deal with them
+  if(!st.threatsActed){st.threatsActed=true;impsHop();if(st.boss&&st.boss.hp>0)bossAct()}
   // the Auditor's patience
   if(st.round>=2){const pace=st.tgt/st.dropsMax;
     if(s<pace*.25){st.patience=Math.min(100,(st.patience||0)+34);popup(W/2,150,'THE AUDITOR SIGHS','#ff3b2f',15)}
     else if(s>=pace*2)st.patience=Math.max(0,(st.patience||0)-25);
-    if(st.patience>=100){st.patience=0;auditorSnaps()}}
+    if(st.patience>=100&&!st.snapped){st.patience=0;st.snapped=true;auditorSnaps()}else if(st.snapped)st.patience=Math.min(99,st.patience)}
 }
 function auditorSnaps(){
   const opts=['row'];if(st.inv.some(x=>!(x.frz>0)))opts.push('freeze');if(st.inv.length<st.slots)opts.push('curse');
@@ -812,7 +830,6 @@ function tickTimers(dt){
   if(!D||!st||st.phase!=='falling'||!anyBall())return;
   const t0=D.time||0,t1=t0+dt;D.time=t1;const prev=curCtx;curCtx={ball:anyBall()};
   st.inv.forEach((x,i)=>{const it=IT[x.id];if(it.trig==='tick'&&Math.floor(t1/it.secs)>Math.floor(t0/it.secs))runItem(i)});
-  if(st.imps&&st.imps.length&&Math.floor(t1/2.5)>Math.floor(t0/2.5))impsHop();
   if(rule('simmer')&&Math.floor(t1/1.5)>Math.floor(t0/1.5)){const q=pick(numPegs());if(q){q.v*=2;q.born=Math.max(q.born,q.v);q.flash=1;popup(q.x,q.y-14,'SIMMER ×2','#ffc35a',13);noteDoubled(1)}}
   if(st.bones)for(let k=st.bones.length-1;k>=0;k--){const bn=st.bones[k];bn.t-=dt;if(bn.cd>0)bn.cd-=dt;if(bn.t<=0)st.bones.splice(k,1)}
   if(hasPerk('chaos')&&Math.floor(t1)>Math.floor(t0)){const c=st.inv.map((x,i)=>i).filter(i=>IT[st.inv[i].id].fn);if(c.length)runItem(pick(c))}
@@ -933,7 +950,7 @@ function tryDrop(pw=.5,ch=0){
   if(ch>=1){st.hellUsed=true;balls[balls.length-1].fire=5;popup(m.x,m.y+40,'HELLFIRE SOUL','#ff6a00',22);shake=8;flash('#ff6a00',.3);burst(m.x,m.y,'#ff6a00',30,260,3)}
   else burst(m.x,m.y,'#ffb02e',10,160,2.5);
   recoil=1;D.charge=ch;D.power=Math.round(-aimAng*57.3);
-  if(st.boss&&st.boss.hp>0){st.boss.shield=0;if(st.dropNo>1)bossAct()}
+  if(st.boss&&st.boss.hp>0&&st.dropNo!==2)st.boss.shield=0;
   if(evIs('bigbang')){const q=pick(numPegs());if(q){popup(q.x,q.y-16,'UNSTABLE','#ff6a00',14);explode(q.x,q.y,50)}}
   fire('start',{});
   if(hasPerk('ignition'))forceTrigger(1,1);
@@ -1752,7 +1769,8 @@ function drawThreats(t){
   for(const im of st.imps||[]){if(im.hp<=0)continue;im.t=Math.min(1,(im.t||0)+.035);const k=im.t,x=im.fx+(im.x-im.fx)*k,y=im.fy+(im.y-im.fy)*k-Math.sin(k*Math.PI)*18+Math.sin(T*6+im.pi)*1.2;im.dx=x;im.dy=y;
     ctx.save();ctx.translate(x,y);ctx.fillStyle='#ff3b2f';ctx.beginPath();ctx.moveTo(-6,-4);ctx.lineTo(-8,-11);ctx.lineTo(-3,-6);ctx.moveTo(6,-4);ctx.lineTo(8,-11);ctx.lineTo(3,-6);ctx.fill();
     circle(0,0,7);ctx.fill();ctx.fillStyle='#ffe066';const lx=b0?Math.sign(b0.x-x)*1.2:0;circle(-2.5+lx,-1,1.6);ctx.fill();circle(2.5+lx,-1,1.6);ctx.fill();ctx.strokeStyle='#2a0006';ctx.lineWidth=1;ctx.beginPath();ctx.arc(0,2,3,.2,Math.PI-.2);ctx.stroke();
-    ctx.strokeStyle='#ff3b2f';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(5,4);ctx.quadraticCurveTo(12,6,10,0);ctx.stroke();ctx.restore()}
+    ctx.strokeStyle='#ff3b2f';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(5,4);ctx.quadraticCurveTo(12,6,10,0);ctx.stroke();ctx.restore();
+    const q=st.pegs[im.tg];if(q&&q.kind&&!st.threatsActed){ctx.save();ctx.globalAlpha=.55+.3*Math.sin(T*5);ctx.strokeStyle='#ff3b2f';ctx.setLineDash([3,3]);ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(x,y+6);ctx.lineTo(q.x,q.y);ctx.stroke();ctx.setLineDash([]);ctx.lineWidth=2;circle(q.x,q.y,pegR(q)+5);ctx.stroke();ctx.restore()}}
   const B=st.boss;
   if(B&&B.hp>0){B.hit=Math.max(0,(B.hit||0)-.05);ctx.save();ctx.translate(B.x+(B.hit?(rnd()-.5)*4:0),B.y);
     const acc=curHell().acc;ctx.shadowColor='#ff3b2f';ctx.shadowBlur=14;ctx.fillStyle=B.hit?'#fff':'#8a0f1c';circle(0,0,B.r);ctx.fill();ctx.shadowBlur=0;
@@ -1761,6 +1779,7 @@ function drawThreats(t){
     ctx.strokeStyle='#ffe066';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-12,12);for(let i=0;i<6;i++)ctx.lineTo(-12+i*4.8+2.4,i%2?12:17);ctx.stroke();
     if(B.shield){ctx.strokeStyle='#9fdcff';ctx.lineWidth=3;ctx.globalAlpha=.6+.3*Math.sin(T*8);circle(0,0,B.r+7);ctx.stroke();ctx.globalAlpha=1}
     const w=80;ctx.fillStyle='#000a';ctx.fillRect(-w/2,-B.r-24,w,8);ctx.fillStyle='#ff3b2f';ctx.fillRect(-w/2+1,-B.r-23,(w-2)*B.hp/B.max,6);ctx.fillStyle='#fff';ctx.font='900 8px Nunito, sans-serif';ctx.textAlign='center';ctx.fillText(B.hp+' / '+B.max,0,-B.r-28);
+    if(B.intent){const it={shield:'SHIELD',smash:'SMASH 6 PEGS',thorns:'GROW 3 THORNS'}[B.intent];ctx.font='900 9px Nunito, sans-serif';ctx.fillStyle='#ffe066';ctx.fillText('NEXT: '+it,0,-B.r-40)}
     ctx.restore()}
   if(evIs('fog')){const g=ctx.createLinearGradient(0,330,0,420);g.addColorStop(0,'#00000000');g.addColorStop(1,curHell().bg[1]);ctx.fillStyle=g;ctx.fillRect(0,330,W,90);ctx.fillStyle=curHell().bg[1];ctx.fillRect(0,420,W,BT-420);ctx.fillStyle='#ffffff10';for(let i=0;i<5;i++){ctx.beginPath();ctx.ellipse((T*20+i*90)%(W+100)-50,440+i*30,70,12,0,0,7);ctx.fill()}}
   if(st.round>=2){const pv=st.patience||0,x0=W*.32,w=W*.36;ctx.fillStyle='#0008';ctx.fillRect(x0,3,w,5);ctx.fillStyle=pv>=68?'#ff3b2f':pv>=34?'#ff8a1a':'#c59a87';ctx.fillRect(x0,3,w*pv/100,5);ctx.font='800 7px Nunito, sans-serif';ctx.textAlign='right';ctx.fillStyle='#c59a87';ctx.fillText('PATIENCE',x0-4,9)}

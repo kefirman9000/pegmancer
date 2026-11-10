@@ -61,3 +61,5 @@ Each 20-round department is its own hell with a palette, animated backdrop, soun
 - **Peg types**: armored, glass (×4 then shatters), ticking (explodes after 3 launches), rot (spreads), chests, greed gems (double each launch you leave them, then crumble), portals; hazards by hell: thorns, red tape, rot.
 - **Every round** can roll a board event (Gold rush, Sliding rows, Whirlpool, Heavy/Feather souls, High society, Fog, Portals, Unstable board, Glassworks, Ironworks, Open bar) and offers a bounty with a reward.
 - **Layouts**: The Spiral, The Cage (a chest in the middle), The Wall (one gap), The Tunnel join the remodel rotation.
+- Threats act once per round: imps mark the peg they want and the boss shows its move; both act after your first launch. Ticking pegs and rot advance once per round. Nothing happens while you're idle.
+- **Multiply/halve relics**: Tripling Forge, Abyssal Square, Cleaver of Halves, The Leveller, Robin of the Pit, Damned Coin, Hyperinflation, Mitosis.
