@@ -202,7 +202,7 @@ const SPECIAL={mult:'#9cff57',gold:'#ffd54a',bumper:'#b26bff',splitter:'#5ce1ff'
 const SPECIAL_GLYPH={mult:'×',gold:'$',bumper:'',splitter:'Y',crit:'!',bomb:'*',shackle:'≡',glutton:'²',warp:'@'};
 const PEGINFO=[['num','Torment pegs: give their value in suffering, then halve. Pop at 0'],['mult','Wrath sigil: +1 mult'],['gold','Coin sigil: +1 soul coin'],['bumper','Rubber sigil: big bounce'],['splitter','Split sigil: splits the soul'],['crit','Agony sigil: doubles mult'],['bomb','Sulfur sigil: blast, once a round'],['shackle','Chain sigil: hits the 3 nearest pegs'],['glutton','Gluttony sigil: doubles the 2 nearest pegs, once a launch'],['warp','Warp sigil: teleports the soul to the top']];
 const RAR={1:{n:'Common',c:'#d9a38f',p:5},2:{n:'Uncommon',c:'#9cff57',p:8},3:{n:'Rare',c:'#ffb02e',p:12},4:{n:'Cursed',c:'#c86bff',p:0},6:{n:'Evolved',c:'#ff4fd8',p:0},5:{n:'Temporary',c:'#5ce1ff',p:6}};
-const TRIG={start:'When a drop starts',hit:'Every peg hit',pop:'Every peg popped',firstPop:'First pop of each drop',wall:'When the soul hits a wall',land:'When a soul lands',end:'When a drop ends',quota:'When you meet quota',restock:'Every restock',round:'When a round starts',bump:'Every rubber sigil hit',bigPop:'Popping a peg born at 8+',passive:'Always on',tick:'On a timer',forced:'When force-triggered',halve:'A peg is halved',bone:'A soul bounces off a bone'};
+const TRIG={start:'When you launch',roundEnd:'At the end of the round',hit:'Every peg hit',pop:'Every peg popped',firstPop:'First pop of each drop',wall:'When the soul hits a wall',land:'When a soul lands',end:'When a drop ends',quota:'When you meet quota',restock:'Every restock',round:'When a round starts',bump:'Every rubber sigil hit',bigPop:'Popping a peg born at 8+',passive:'Always on',tick:'On a timer',forced:'When force-triggered',halve:'A peg is halved',bone:'A soul bounces off a bone'};
 const trigText=it=>it.secs?`Every ${it.secs}s while a soul falls`:it.every?`Every ${it.every} ${it.trig==='popN'?'pops':it.trig==='hitN'?'hits':it.trig==='dblN'?'pegs doubled':it.trig==='halveN'?'pegs halved':'wall hits'}`:TRIG[it.trig];
 const ITEMS=[
  {id:'sling',n:'Pitchfork Jab',g:'SS',r:1,trig:'start',d:L=>`+${4*L} points`,fn:L=>addPts(4*L)},
@@ -320,6 +320,15 @@ const ITEMS=[
  {id:'refund',n:'Halving Refund',g:'Rf',r:1,trig:'halveN',every:15,d:L=>`+${L} coin${L>1?'s':''}`,fn:L=>{if(!modIs('tax')){st.coins+=L;renderBar()}}},
  {id:'phoenix',n:'Phoenix Ash',g:'PA',r:3,trig:'halve',d:L=>`When a peg is halved down to 1, ${15*L}% chance it is reborn at its peak value`,fn:(L,c)=>{const p=c.peg;if(p&&p.kind==='num'&&p.v===1&&p.born>2&&rnd()<.15*L){p.v=p.born;p.flash=1;popup(p.x,p.y-16,'REBORN '+fmt(p.v),'#ff8a1a',15);burst(p.x,p.y,'#ff8a1a',16,180,2.5)}}},
  {id:'hollow',n:'Hollow Echo',g:'HE',r:2,trig:'halve',d:L=>`When a peg of 64+ is halved, score the lost half again${L>1?' ×'+L:''}`,fn:(L,c)=>{if(c.old>=64)addPts(c.lost*L)}},
+ {id:'volley',n:'Volley of the Damned',g:'Vo',r:2,trig:'start',d:L=>`Launch ${L} extra soul${L>1?'s':''} alongside, angled outward`,fn:L=>{const m=muzzle(aimAng);for(let k=0;k<L;k++){const a=aimAng+(k%2?1:-1)*(.14+.06*Math.floor(k/2));spawn(m.x,m.y,Math.sin(a)*SHOT,Math.cos(a)*SHOT)}}},
+ {id:'lastcall',n:'Last Call',g:'LC',r:2,trig:'start',d:L=>`Your last launch of the round gets mult ×${fmt(1.5+.5*L)}`,fn:L=>{if(st.dropsLeft===1){D.mult*=1.5+.5*L;popup(W/2,DROP_Y+40,'LAST CALL ×'+fmt(1.5+.5*L),'#ffd54a',16)}}},
+ {id:'opener',n:'Opening Act',g:'OA',r:1,trig:'start',d:L=>`Your first launch of the round starts with ${15*L}× the base peg value in points`,fn:L=>{if(st.dropNo===1)addPts(15*L*baseVal())}},
+ {id:'windup',n:'Wind-Up',g:'WU',r:2,trig:'start',d:L=>`+${fmt(.3*L)} mult for every launch you've already made this round`,fn:L=>addMult(.3*L*(st.dropNo-1))},
+ {id:'closing',n:'Closing Bell',g:'CB',r:1,trig:'roundEnd',d:L=>`Add ${5*L}% to the round's score`,fn:L=>addPts(st.roundScore*.05*L)},
+ {id:'leftover',n:'Leftover Souls',g:'LS',r:2,trig:'roundEnd',d:L=>`Each launch you didn't use doubles ${2*L} random pegs`,fn:L=>{for(let k=0;k<st.dropsLeft;k++)doublePegs(2*L)}},
+ {id:'reaper',n:'Grim Accountant',g:'GA',r:1,trig:'roundEnd',d:L=>`Clear every 1-peg off the board, +${L} coin per 3 cleared`,fn:L=>{const o=numPegs().filter(p=>p.v<=1);o.forEach(p=>{p.kind=null;p.v=0;clearT(p)});const c=Math.floor(o.length/3)*L;if(c&&!modIs('tax'))st.coins+=c}},
+ {id:'harvest',n:'Harvest Moon',g:'HMn',r:2,trig:'roundEnd',d:L=>`Double your ${L} biggest peg${L>1?'s':''}`,fn:L=>{const l=numPegs().sort((a,b)=>b.v-a.v).slice(0,L);l.forEach(p=>{p.v*=2;p.born=Math.max(p.born,p.v)});noteDoubled(l.length)}},
+ {id:'safetynet',n:'Safety Net',g:'SN',r:3,trig:'roundEnd',d:L=>`If you finish within ${20*L}% of quota, it covers the gap, then snaps`,fn:L=>{const short=st.tgt-st.roundScore;if(short>0&&short<=st.tgt*.2*L){addPts(short+1);st.netUsed=true;const x=st.inv.find(y=>y.id==='safetynet');if(x)x.burn=1}}},
  {id:'rocket',n:'Hellfire Rocket',g:'Rk',r:2,trig:'wallN',every:4,d:L=>`Blast at the soul (size ${L})`,fn:(L,c)=>{const b=c.ball||anyBall();if(b)explode(b.x,b.y,50+15*L)}},
 ];
 const CURSED=[
@@ -331,7 +340,7 @@ const CURSED=[
  {id:'mouth',n:'Hungry Maw',g:'HM',r:4,trig:'start',d:()=>`+1 mult per 2 empty slots`,fn:()=>addMult(Math.floor(emptyCount()/2))},
  {id:'clock',n:'Shattered Clock',g:'SC',r:4,trig:'passive',d:()=>'+2 drops every round. Targets are 30% higher.'},
  {id:'serpent',n:'Serpent\'s Gamble',g:'Sn',r:4,trig:'firstPop',d:()=>'50%: double every peg. Otherwise halve them all.',fn:()=>{const all=numPegs();if(rnd()<.5){all.forEach(p=>{p.v*=2;p.born=Math.max(p.born,p.v);p.flash=1});popup(W/2,BT-140,'THE SERPENT SMILES','#9cff57',20,.5);noteDoubled(all.length)}else{all.forEach(p=>{p.v=Math.floor(p.v/2);p.flash=1;if(p.v<=0){p.kind=null;p.v=0}});popup(W/2,BT-140,'THE SERPENT BITES','#ff3b2f',20,.5)}}},
- {id:'abyss',n:'Abyss Lens',g:'AL',r:4,trig:'start',d:()=>'Double every number peg as a drop starts. Halve them all when it ends.',fn:()=>st.pegs.forEach(p=>{if(p.kind==='num')p.v*=2})},
+ {id:'abyss',n:'Abyss Lens',g:'AL',r:4,trig:'start',d:()=>'Double every number peg as you launch. Halve them all when it ends.',fn:()=>st.pegs.forEach(p=>{if(p.kind==='num')p.v*=2})},
 ];
 const EVOLVED=[
  {id:'inferno',n:'Inferno Snowball',g:'IS',r:6,from:['ember','snowball'],trig:'hit',d:()=>'+0.6 mult',fn:()=>addMult(.6)},
@@ -353,7 +362,12 @@ function checkEvolve(){
 const PERKS=[
  {id:'spark',n:'Oath of Kindling',d:'Every 25 pops, trigger your leftmost item.'},
  {id:'rebound',n:'Oath of Recoil',d:'Hitting a wall triggers your rightmost item.'},
- {id:'ignition',n:'Oath of Ignition',d:'When a drop starts, trigger the item in slot 2.'},
+ {id:'kickoff',n:'Oath of the Kickoff',d:'When you launch, trigger a random relic.'},
+ {id:'finale',n:'Oath of the Finale',d:'Your last launch of each round triggers every relic once.'},
+ {id:'salvo',n:'Oath of the Salvo',d:'Every third launch fires two extra souls beside the first.'},
+ {id:'closer',n:'Oath of Closing Time',d:'At the end of each round, trigger your rightmost relic 3 times.'},
+ {id:'reckoning',n:'Oath of Reckoning',d:'At the end of each round, +1 coin for every 5 pegs popped that round.'},
+ {id:'ignition',n:'Oath of Ignition',d:'When you launch, trigger the item in slot 2.'},
  {id:'lap',n:'Oath of Triumph',d:'When you meet quota, trigger every item once.'},
  {id:'jackpot',n:'Oath of Fortune',d:'Landing in a ×4 bucket triggers your leftmost item.'},
  {id:'rush',n:'Oath of Supply',d:'Every 5 restocks, trigger your rightmost item.'},
@@ -363,7 +377,7 @@ const PERKS=[
  {id:'pockets',n:'Bottomless Coffers',d:'Interest cap rises from 5 to 12 coins.'},
  {id:'pocket',n:'Extra Shelf',d:'+1 item slot (up to 7).',gain:()=>{st.slots=Math.min(7,st.slots+1)}},
  {id:'chef',n:'Canteen Tab',d:'+1 snack slot.',gain:()=>{st.foodSlots++}},
- {id:'avarice',n:'Oath of Avarice',d:'When a drop starts, trigger slot 4 once per 7 coins you hold (up to 5).'},
+ {id:'avarice',n:'Oath of Avarice',d:'When you launch, trigger slot 4 once per 7 coins you hold (up to 5).'},
  {id:'emptiness',n:'Oath of Emptiness',d:'When a drop ends, trigger your rightmost item twice per empty slot.'},
  {id:'chaos',n:'Oath of Chaos',d:'Every second a soul is falling, trigger a random item.'},
  {id:'cascade',n:'Oath of Cascade',d:'Every 10 links in a chain reaction trigger your leftmost item.'},
@@ -535,7 +549,12 @@ function setupRound(){
   restorePegs();
   // last round's temporary pieces turn back into ordinary pegs
   st.pegs.forEach(p=>{p.under=false;if(p.kind==='tape'||p.kind==='thorn'||p.kind==='portal'){p.kind='num';p.v=baseVal();p.born=p.v;clearT(p)}});
-  st.ptouch=0;st.impKills=0;st.threatsActed=false;st.snapped=false;
+  st.ptouch=0;st.impKills=0;st.popsRound=0;
+  // carry the biggest number forward: every peg on the new table is at least as big as last round's biggest
+  if(r>=2){const big=Math.max(0,...st.pegs.filter(p=>p.kind==='num').map(p=>p.v));const fl=Math.min(2**120,big>1?2**Math.floor(Math.log2(big)):1);
+    if(fl>(st.pegFloor||1)){st.pegFloor=fl;popup(W/2,DROP_Y+70,'PEG FLOOR RISES TO '+fmt(fl),'#9cff57',16,.5)}
+    st.pegs.forEach(p=>{if(p.kind==='num'&&p.v<st.pegFloor){p.v=st.pegFloor;p.born=Math.max(p.born,p.v);p.flash=.8}});
+    if(st.pegs.some(p=>p.kind==='gem'))st.pegs.forEach(p=>{if(p.kind==='gem'&&p.v<st.pegFloor*2){p.v=st.pegFloor*2;p.born=p.v}})}st.threatsActed=false;st.snapped=false;
   if(r>=2)boardTurn();
   // the deeper you go, the more hazards each hell lays out
   if(r>=2){const hz=HAZ[hellIdOf(r)],nh=Math.min(8,1+depth);if(hz==='rot'){if(!st.pegs.some(p=>p.kind==='rot'))placeKind('rot',Math.max(1,Math.floor(nh/3)))}else placeKind(hz,nh)}
@@ -728,7 +747,8 @@ $('muteBtn').textContent=muted?'♪ Off':'♪ On';
 
 // ---------- board ----------
 const zoneOf=r=>Math.min(3,Math.floor((r-1)/20));
-const baseVal=()=>Math.pow(2,Math.floor(st.round/5));
+// numbers only ever go up: new pegs start at the run's peg floor, which rises to the biggest peg you've had
+const baseVal=()=>Math.max(Math.pow(2,Math.floor(st.round/5)),(st&&st.pegFloor)||1);
 const REMODELS=['Standard Issue','The Slant','The Chasm','The Funnel','Twin Pits','The Spiral','The Cage','The Wall','The Tunnel'];
 const REMODEL_ORDER=[1,5,2,6,3,7,4,8];
 // every 5 rounds inside a department the board changes shape; values carry over
@@ -809,6 +829,15 @@ const maxPeg=()=>st.pegs.reduce((a,p)=>Math.max(a,p.kind==='num'?p.v:0),0);
 function doublePegs(n){const l=shuffle(numPegs()).slice(0,n);l.forEach(p=>{p.v*=2;p.born=Math.max(p.born,p.v);p.flash=1;if(curItem>=0)fxBeam(curItem,p.x,p.y,'#ffd54a')});noteDoubled(l.length)}
 // every halving (your hits, the cleaver, even imps and bosses) can set off halving relics
 function halved(p,old,foe){if(!D||!st||!p)return;D.halves=(D.halves||0)+1;const c={peg:p,old,lost:old-p.v,foe:!!foe};fire('halve',c);fireEvery('halveN',D.halves,c)}
+function roundEndFire(){
+  const out=[];D={points:0,mult:1,hits:0,pops:0,walls:0,bucket:0,bucketBonus:0,fx:{},chainLeft:0,chain:0,links:0};
+  fire('roundEnd',{});if(hasPerk('closer')&&st.inv.length)forceTrigger('last',3);
+  const add=Math.floor(D.points*D.mult);D=null;
+  if(add>0){st.roundScore+=add;out.push(['End-of-round relics','+'+fmtInt(add)+' score'])}
+  if(hasPerk('reckoning')&&!modIs('tax')){const c=Math.floor((st.popsRound||0)/5);if(c){st.coins+=c;out.push(['Oath of Reckoning',c])}}
+  if(st.netUsed){out.push(['Safety Net','covered the gap and snapped']);st.netUsed=false}
+  return out;
+}
 function noteDoubled(n){if(!D||!n)return;for(let k=0;k<n;k++){D.dbls=(D.dbls||0)+1;fireEvery('dblN',D.dbls,{})}}
 function growPegs(n){const t=baseVal()*4;shuffle(numPegs()).slice(0,n).forEach(p=>{p.v=Math.max(p.v,t);p.born=Math.max(p.born,p.v);p.flash=1})}
 function convert(kind,n){shuffle(numPegs()).slice(0,n).forEach(p=>{p.kind=kind;p.v=0;p.flash=1});st.specials[kind]=(st.specials[kind]||0)+n}
@@ -983,6 +1012,9 @@ function tryDrop(pw=.5,ch=0){
   if(hasPerk('ignition'))forceTrigger(1,1);
   if(hasPerk('avarice')){const k=Math.min(5,Math.floor(st.coins/7));if(k>0)forceTrigger(3,k)}
   if(hasPerk('early')&&st.dropNo===1)forceTrigger('first',3);
+  if(hasPerk('kickoff')&&st.inv.length)forceTrigger(Math.floor(rnd()*st.inv.length),1);
+  if(hasPerk('finale')&&st.dropsLeft===1&&st.inv.length){popup(W/2,DROP_Y+60,'GRAND FINALE','#ffd54a',20,.5);forceTrigger('all',1)}
+  if(hasPerk('salvo')&&st.dropNo%3===0){const m=muzzle(aimAng);for(const s2 of [-1,1])spawn(m.x,m.y,Math.sin(aimAng+s2*.2)*SHOT,Math.cos(aimAng+s2*.2)*SHOT)}
   blip(220,.08,'sine',.06);
 }
 function popup(x,y,text,color='#fff',size=14,slow=1){if(pops.length>140)pops.shift();const hw=Math.min(W/2-4,String(text).length*size*.3+6);x=Math.max(hw,Math.min(W-hw,x));pops.push({x,y,text,color,size,t:0,k:slow})}
@@ -1060,7 +1092,7 @@ function hitPeg(p,b,blast){
   fireEvery('hitN',D.hits,{peg:p,ball:b,v0});
 }
 function popPeg(p,b){
-  const born=p.born;burst(p.x,p.y,'#ff6a00',10,150,3);blasts.push({x:p.x,y:p.y,r:20,t:0,c:'#ffb02e'});p.kind=null;p.v=0;clearT(p);D.pops++;bountyProg('pops');
+  const born=p.born;burst(p.x,p.y,'#ff6a00',10,150,3);blasts.push({x:p.x,y:p.y,r:20,t:0,c:'#ffb02e'});p.kind=null;p.v=0;clearT(p);D.pops++;st.popsRound=(st.popsRound||0)+1;bountyProg('pops');
   if(st.boss&&st.boss.hp>0&&D.pops%10===0)hurtBoss(1,p);
   if(rule('paperwork')&&D.pops%5===0){st.coins++;st.forms=(st.forms||0)+1;popup(p.x,p.y-24,'FILED +1c','#e8c37a',13)}
   if(rule('ossuary')&&st.bones.length<30)st.bones.push({x:p.x,y:p.y,t:4,a:rnd()*3,cd:0});
@@ -1169,12 +1201,13 @@ function finishDrop(){
 }
 function endRound(){
   if(st.phase==='over')return;
-  st.phase='between';balls=[];st.lastScore=st.roundScore;
+  st.phase='between';balls=[];
+  const reLines=roundEndFire();st.lastScore=st.roundScore;
   st.inv.forEach(x=>{if(x.frz>0)x.frz--});
   const bossAlive=!!(st.boss&&st.boss.hp>0);
   if(st.bounty&&st.bounty.id==='nothorn'&&!st.bounty.done&&!st.ptouch)completeBounty();
   const won=st.roundScore>=st.tgt&&!bossAlive;
-  const lines=[];
+  const lines=reLines.slice();
   if(won){
     const base=3+Math.floor(st.round/10);
     const left=st.dropsLeft*2;
@@ -1466,6 +1499,7 @@ function summaryText(){
   o.push('PEGMANCER RUN SUMMARY');
   o.push(`Version ${VERSION} · started ${L.started}${L.ended?' · ended '+L.ended:''}`);
   o.push(`Hells: ${[0,1,2,3].map(z=>HELLS[(st.hells&&st.hells[z])||DEF_HELLS[z]].n).join(' → ')}`);
+  o.push(`Peg floor: ${fmt(st.pegFloor||1)}`);
   o.push(`Curses: ${(st.curses||[]).map(k=>CURSES[k].n).join(', ')||'none'} · patience ${st.patience||0}/100`);
   o.push(`Contract: ${(VARIANTS.find(v=>v.id===st.variant)||VARIANTS[0]).n} · seed ${st.seed}${st.daily?' · daily run '+st.daily:''}`);
   o.push(st.phase==='over'?`Result: out of lives on round ${st.round}`:`Status: round ${st.round} (${hellOf(st.round).n}), ${fmtInt(st.roundScore)} / ${fmtInt(st.tgt)}, ${st.dropsLeft} drops left`);
