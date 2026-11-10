@@ -466,8 +466,8 @@ const curseIs=k=>!!(st&&st.curses&&st.curses.includes(k));
 function addCurse(){if(!st.curses)st.curses=[];const o=Object.keys(CURSES).filter(k=>!st.curses.includes(k));if(!o.length)return null;const k=pick(o);st.curses.push(k);logEv('cursed: '+CURSES[k].n);return k}
 const EVENTS={
  goldrush:{n:'Gold rush',d:'Every sigil you hit also pays 1 coin.'},
- sliding:{n:'Sliding rows',d:'Every other row slides side to side.',setup:()=>st.pegs.forEach(p=>{const row=Math.round((p.y-132)/45);if(row%2===1&&!p.under)p.mv={k:'slide',a:20,ph:row}})},
- orbit:{n:'Whirlpool',d:'Pegs near the middle orbit slowly.',setup:()=>st.pegs.forEach(p=>{const d=Math.hypot(p.x-200,p.y-330);if(d<115&&d>4&&!p.under)p.mv={k:'orbit',r:d,a0:Math.atan2(p.y-330,p.x-200)}})},
+ sliding:{n:'Sliding rows',d:'Every other row slides side to side.',setup:()=>{st.pegs.forEach(p=>{const row=Math.round((p.y-132)/45);if(row%2===1&&!p.under&&p.kind)p.mv={k:'slide',a:20,ph:row}});clearPaths()}},
+ orbit:{n:'Whirlpool',d:'Pegs near the middle orbit slowly.',setup:()=>{st.pegs.forEach(p=>{const d=Math.hypot(p.x-200,p.y-330);if(d<115&&d>4&&!p.under&&p.kind)p.mv={k:'orbit',r:d,a0:Math.atan2(p.y-330,p.x-200)}});clearPaths()}},
  heavy:{n:'Heavy souls',d:'Souls fall 30% faster.'},
  float:{n:'Feather souls',d:'Souls fall 30% slower.'},
  toprows:{n:'High society',d:'Pegs in the top three rows score ×2.'},
@@ -505,6 +505,24 @@ function placeKind(kind,n,filter){
   c.forEach(p=>{clearT(p);p.age=0;p.kind=kind;p.v=0;p.flash=1;if(kind==='rot')p.hp=2;if(kind==='chest')p.hp=3;if(kind==='gem'){p.v=baseVal()*2;p.born=p.v}});return c;
 }
 function addTrait(t,n){shuffle(numPegs().filter(p=>!p.armor&&!p.glass&&!p.tick&&!p.rotten&&!p.under)).slice(0,n).forEach(p=>{if(t==='armor')p.armor=2+(zoneOf(st.round)>=2?1:0);if(t==='glass')p.glass=true;if(t==='tick')p.tick=3;p.flash=1})}
+// Moving pegs must never pass through other pegs. Anything sitting in a mover's path is cleared off the
+// board for the round (precious pieces like chests stay, and the movers near them stop moving instead).
+// A sliding row moves as one, and the whirlpool turns as one, so they can't hit themselves.
+const PATH_CLEAR=32;
+function vacate(p){p.kind=null;p.v=0;clearT(p);p.mv=null;p.off=true;p.under=true}
+function pathDist(q,m){if(m.mv.k==='slide')return Math.hypot(Math.max(0,Math.abs(q.x-m.x)-m.mv.a),q.y-m.y);return Math.abs(Math.hypot(q.x-200,q.y-330)-m.mv.r)}
+function clearPaths(){
+  const movers=()=>st.pegs.filter(p=>p.mv&&p.kind);
+  for(const q of st.pegs){if(!q.kind||q.mv||q.under)continue;const hit=movers().filter(m=>pathDist(q,m)<PATH_CLEAR);if(!hit.length)continue;
+    if(q.kind==='chest'||q.kind==='gem'||q.kind==='rot'||q.kind==='portal')hit.forEach(m=>m.mv=null);else vacate(q)}
+  const ms=movers();
+  for(let i=0;i<ms.length;i++)for(let j=i+1;j<ms.length;j++){const a=ms[i],b=ms[j];if(!a.kind||!b.kind||!a.mv||!b.mv)continue;
+    if(a.mv.k==='orbit'&&b.mv.k==='orbit')continue;if(a.mv.k==='slide'&&b.mv.k==='slide'&&a.mv.ph===b.mv.ph)continue;
+    const d=a.mv.k==='slide'&&b.mv.k==='slide'?Math.hypot(Math.max(0,Math.abs(a.x-b.x)-a.mv.a-b.mv.a),a.y-b.y):Math.min(pathDist(a,b),pathDist(b,a));
+    if(d<PATH_CLEAR)vacate(b)}
+  // a mover that was frozen next to a chest may now sit in another mover's path
+  for(const q of st.pegs){if(!q.kind||q.mv||q.under||q.kind==='chest'||q.kind==='gem'||q.kind==='rot'||q.kind==='portal')continue;if(movers().some(m=>pathDist(q,m)<PATH_CLEAR))vacate(q)}
+}
 function restorePegs(){st.pegs.forEach(p=>{if(p.ox!=null){p.x=p.ox;p.y=p.oy;p.ox=p.oy=null}p.mv=null})}
 function movePegs(t){
   if(!st||!st.pegs)return;const T=t/1000;
@@ -718,7 +736,8 @@ const remodelIdx=r=>{const b=Math.floor((r-1)/5)%4;return b===0?0:REMODEL_ORDER[
 const remodelFor=r=>r>1&&(r-1)%5===0&&zoneOf(r)===zoneOf(r-1)&&remodelIdx(r)!==remodelIdx(r-1)?REMODELS[remodelIdx(r)]:null;
 function customLayout(v){
   const pts=[],add=(x,y)=>pts.push({x:Math.max(12,Math.min(PW-12,x)),y});
-  if(v===5){for(let k=0;k<80;k++){const a=k*.43,rad=14+k*2.5,x=200+Math.cos(a)*rad*1.08,y=330+Math.sin(a)*rad*.98;if(y>118&&y<560&&x>12&&x<388)add(x,y)}return pts}
+  // spiral: pegs spaced 38px apart along an Archimedean spiral whose turns are ~50px apart
+  if(v===5){let a=0;add(200,330);while(a<40){const rad=30+8*a;if(rad>260)break;const x=200+Math.cos(a)*rad,y=330+Math.sin(a)*rad;if(y>118&&y<560&&x>12&&x<388)add(x,y);a+=38/rad}return pts}
   const g=layoutSlots(0,0);
   if(v===6){g.forEach(p=>{if(Math.hypot(p.x-200,p.y-330)>=82)pts.push(p)});for(let k=0;k<14;k++){const a=-Math.PI/2+(k+.5)*2*Math.PI/14;if(k===0||k===13)continue;add(200+Math.cos(a)*62,330+Math.sin(a)*62)}add(200,330);return pts}
   if(v===7){const gx=80+rnd()*240;g.forEach(p=>{if(p.y<300||p.y>365)pts.push(p)});for(let x=16;x<=384;x+=24)if(Math.abs(x-gx)>30)add(x,332);return pts}
