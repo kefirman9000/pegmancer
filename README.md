@@ -52,3 +52,12 @@ If you find this useful, you can support my work through [GitHub Sponsors](https
 ### Hells
 Each 20-round department is its own hell with a palette, animated backdrop, sounds, music and a house rule. You start in the Intake Office (Paperwork), pick one of two doors after the round-20 and round-40 bosses, and end in The Abyss (Gravity well). Door hells: Lava Works (Magma tide), Bone Archive (Ossuary), Frozen Treachery (Black ice), Gluttony's Kitchen (Simmer), Hall of Mirrors (Reflection), Storm of Lust (Gale), Eternal Library (Re-reading). Each hell stocks two relics you can't find anywhere else. Boss rounds put a face behind the board, and the room glows when you're far over quota.
 - **Buckets**: landings look and sound different by multiplier (a dud puffs, ×1.5 rings, ×2 flares, ×4 erupts with gold rays), buckets match the hell you're in, and six bucket enchantments can be bought as board upgrades: Furnace (erupts up its column), Tithe (pays coins), Spring (flings the soul back up), Fattening (grows +0.25 per landing, permanently), Crimson (adds its value to mult), Spawning (releases 2 souls). Bucket relics: Bucket Brigade, Hellmouth, Brimstone Geyser, Payout Chute, Trampoline of Torment, Rising Stakes.
+
+### Threats and variety
+- **Imps** hop between pegs and halve them during and after launches; hit one with a soul to slay it for coins.
+- **Bosses** stand on the board with a health bar. Drain it with soul hits and pops, and make quota, to win. Each launch they shield, smash pegs or grow thorns. Scraping past a boss under 1.5× quota adds a curse.
+- **The Auditor's patience** (bar at the top) fills on weak launches; when it runs out a relic is confiscated, the top row is set to 1, or a cursed relic is forced on you.
+- **Missing quota** also freezes a relic for 3 rounds or adds a run-long curse (Leaden Souls, Rusted Buckets, Usury, Briar Curse, Infestation, Drought).
+- **Peg types**: armored, glass (×4 then shatters), ticking (explodes after 3 launches), rot (spreads), chests, greed gems (double each launch you leave them, then crumble), portals; hazards by hell: thorns, red tape, rot.
+- **Every round** can roll a board event (Gold rush, Sliding rows, Whirlpool, Heavy/Feather souls, High society, Fog, Portals, Unstable board, Glassworks, Ironworks, Open bar) and offers a bounty with a reward.
+- **Layouts**: The Spiral, The Cage (a chest in the middle), The Wall (one gap), The Tunnel join the remodel rotation.
