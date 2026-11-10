@@ -64,5 +64,5 @@ Each 20-round department is its own hell with a palette, animated backdrop, soun
 - Threats act once per round: imps mark the peg they want and the boss shows its move; both act after your first launch. Ticking pegs and rot advance once per round. Nothing happens while you're idle.
 - **Multiply/halve relics**: Tripling Forge, Abyssal Square, Cleaver of Halves, The Leveller, Robin of the Pit, Damned Coin, Hyperinflation, Mitosis.
 - **Halving relics**: a new "a peg is halved" trigger fires on every halving, including ones imps and bosses cause: Silver Lining, Splinter Shards, Karmic Debt, Halving Refund, Phoenix Ash, Hollow Echo.
-- **Numbers keep growing**: at the start of every round, the peg floor rises to last round's biggest peg (rounded down to a power of 2). Every peg below it is raised to it, and new pegs spawn at it or higher.
+- **Numbers keep growing**: your top peg starts every round at least double what it started at the round before, so halving can't drag your best number backwards. Smaller pegs are left as they are.
 - **Launch and end-of-round pieces**: relics Volley of the Damned, Last Call, Opening Act, Wind-Up (on launch) and Closing Bell, Leftover Souls, Grim Accountant, Harvest Moon, Safety Net (at the end of the round); oaths of the Kickoff, the Finale, the Salvo, Closing Time and Reckoning.

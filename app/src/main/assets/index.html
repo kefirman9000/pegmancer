@@ -550,11 +550,12 @@ function setupRound(){
   // last round's temporary pieces turn back into ordinary pegs
   st.pegs.forEach(p=>{p.under=false;if(p.kind==='tape'||p.kind==='thorn'||p.kind==='portal'){p.kind='num';p.v=baseVal();p.born=p.v;clearT(p)}});
   st.ptouch=0;st.impKills=0;st.popsRound=0;
-  // carry the biggest number forward: every peg on the new table is at least as big as last round's biggest
-  if(r>=2){const big=Math.max(0,...st.pegs.filter(p=>p.kind==='num').map(p=>p.v));const fl=Math.min(2**120,big>1?2**Math.floor(Math.log2(big)):1);
-    if(fl>(st.pegFloor||1)){st.pegFloor=fl;popup(W/2,DROP_Y+70,'PEG FLOOR RISES TO '+fmt(fl),'#9cff57',16,.5)}
-    st.pegs.forEach(p=>{if(p.kind==='num'&&p.v<st.pegFloor){p.v=st.pegFloor;p.born=Math.max(p.born,p.v);p.flash=.8}});
-    if(st.pegs.some(p=>p.kind==='gem'))st.pegs.forEach(p=>{if(p.kind==='gem'&&p.v<st.pegFloor*2){p.v=st.pegFloor*2;p.born=p.v}})}st.threatsActed=false;st.snapped=false;
+  // the top peg keeps climbing: each round it starts at least double what it started at last round
+  // (small pegs are left alone). Halving can't drag your best number backwards between rounds.
+  {const n=st.pegs.filter(p=>p.kind==='num'&&!p.under);if(n.length){const top=n.reduce((a,p)=>p.v>a.v?p:a);
+    const want=Math.min(2**120,Math.max(top.v,(st.topPeg||0)*2));
+    if(want>top.v){top.v=want;top.born=Math.max(top.born,want);top.flash=1;popup(top.x,top.y-18,'TOP PEG ▲ '+fmt(want),'#9cff57',15,.5)}
+    st.topPeg=top.v}}
   if(r>=2)boardTurn();
   // the deeper you go, the more hazards each hell lays out
   if(r>=2){const hz=HAZ[hellIdOf(r)],nh=Math.min(8,1+depth);if(hz==='rot'){if(!st.pegs.some(p=>p.kind==='rot'))placeKind('rot',Math.max(1,Math.floor(nh/3)))}else placeKind(hz,nh)}
@@ -747,8 +748,7 @@ $('muteBtn').textContent=muted?'♪ Off':'♪ On';
 
 // ---------- board ----------
 const zoneOf=r=>Math.min(3,Math.floor((r-1)/20));
-// numbers only ever go up: new pegs start at the run's peg floor, which rises to the biggest peg you've had
-const baseVal=()=>Math.max(Math.pow(2,Math.floor(st.round/5)),(st&&st.pegFloor)||1);
+const baseVal=()=>Math.pow(2,Math.floor(st.round/5));
 const REMODELS=['Standard Issue','The Slant','The Chasm','The Funnel','Twin Pits','The Spiral','The Cage','The Wall','The Tunnel'];
 const REMODEL_ORDER=[1,5,2,6,3,7,4,8];
 // every 5 rounds inside a department the board changes shape; values carry over
@@ -1499,7 +1499,7 @@ function summaryText(){
   o.push('PEGMANCER RUN SUMMARY');
   o.push(`Version ${VERSION} · started ${L.started}${L.ended?' · ended '+L.ended:''}`);
   o.push(`Hells: ${[0,1,2,3].map(z=>HELLS[(st.hells&&st.hells[z])||DEF_HELLS[z]].n).join(' → ')}`);
-  o.push(`Peg floor: ${fmt(st.pegFloor||1)}`);
+  o.push(`Top peg this round started at: ${fmt(st.topPeg||0)}`);
   o.push(`Curses: ${(st.curses||[]).map(k=>CURSES[k].n).join(', ')||'none'} · patience ${st.patience||0}/100`);
   o.push(`Contract: ${(VARIANTS.find(v=>v.id===st.variant)||VARIANTS[0]).n} · seed ${st.seed}${st.daily?' · daily run '+st.daily:''}`);
   o.push(st.phase==='over'?`Result: out of lives on round ${st.round}`:`Status: round ${st.round} (${hellOf(st.round).n}), ${fmtInt(st.roundScore)} / ${fmtInt(st.tgt)}, ${st.dropsLeft} drops left`);
